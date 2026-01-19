@@ -1,0 +1,27 @@
+' This sequence diagram is authoritative for Feature flow semantics
+
+@startuml
+title FTR-XXX Sequence
+
+actor User
+participant "Entry API" as API
+participant "ModuleA.Service" as SVC
+participant "ModuleB.Component" as CMP
+database "DB" as DB
+
+== Main Flow ==
+User -> API: request(...)
+API -> SVC: call FUN-001(...)
+SVC -> CMP: call FUN-002(...)
+CMP -> DB: query/update
+DB --> CMP: result
+CMP --> SVC: output
+SVC --> API: response
+API --> User: response
+
+== Error / Edge Cases ==
+note over API,SVC
+List error branches here and link to FUN-XXX E-xx
+end note
+
+@enduml

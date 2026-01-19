@@ -1,0 +1,18 @@
+@startuml
+title FTR-XXX Class Diagram
+
+package "<module>" {
+  class Service {
+    +methodA(...)
+    +methodB(...)
+  }
+
+  class Repository {
+    +save(...)
+    +find(...)
+  }
+
+  Service --> Repository
+}
+
+@enduml
