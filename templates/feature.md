@@ -7,6 +7,7 @@
 
 ## 0. Metadata
 - ID: FTR-XXX
+- SCN ID: SCN-XXX
 - Steward: <name/team>   # long-term product/tech owner, NOT stage executor
 - Group/Module: <group>/<module>
 - Priority: <P0|P1|P2>
@@ -15,8 +16,27 @@
 - Resolution Status: <Draft | Stable | Deprecated>
 - Depends On: [FTR-???], [FUN-???]
 - Users / Stakeholders: <who benefits>
+-----------------------------------------------------------------------------------------
+## 1. API / SPI Contract (Frozen Boundary)
+> API is what callers use. SPI is interface to be implemented for calling back.
 
-## 1. Stage Ownership and Execution State
+### API (Provided)
+- `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
+  - Params: ...
+  - Returns: ...
+  - Throws: ...
+  - Notes: ...
+
+### SPI (For Implementation)
+- `<module>.<class>.<interface>(...) -> ...` or REST/CLI/SDK event
+  - Params: ...
+  - Returns: ...
+  - Throws: ...
+  - Notes: ...
+  - Trigger Condition: ...
+-----------------------------------------------------------------------------------------
+
+## 2. Stage Ownership and Execution State
 
 > This table is the single source of truth for Feature execution state.
 
@@ -29,23 +49,23 @@
 | Acceptance   | NotStarted   | -            | -                  | -                  | -                  | -              |
 
 
-## 2. Summary (One Paragraph)
+## 3. Summary (One Paragraph)
 <What user problem it solves and what value it provides.>
 
-## 3. Scope
+## 4. Scope
 ### In Scope
 - ...
 
 ### Out of Scope
 - ...
 
-## 4. User Journey / Flow (Text)
+## 5. User Journey / Flow (Text)
 > Describe the feature as an ordered flow. Later it must match the sequence diagram.
 1. Step 1 ...
 2. Step 2 ...
 3. Step 3 ...
 
-## 5. Inputs / Outputs (Feature-level)
+## 6. Inputs / Outputs (Feature-level)
 > Feature-level I/O can be higher-level than Function I/O, but must be explicit.
 ### Inputs
 - ...
@@ -53,19 +73,15 @@
 ### Outputs
 - ...
 
-## 6. Functional Composition (Functions)
+## 7. Functional Composition (Functions)
 > The feature is composed by Functions in a flow order.
 - FUN-001: <title> (role in flow: ...)
 - FUN-002: ...
 
-## 7. Acceptance Criteria (Feature-level)
+## 8. Acceptance Criteria (Feature-level)
 > Feature-level ACs verify end-to-end behavior.
 - FAC-01: Given ... When ... Then ...
 - FAC-02: ...
-
-## 8. API Surface (Feature entry points)
-- Entry: `<module>.<class>.<method>(...) -> ...`
-- External interfaces: REST/CLI/SDK events etc.
 
 ## 9. Design Artifacts Index
 - Sequence Diagram: `/design/uml/FTR-XXX.sequence.puml`

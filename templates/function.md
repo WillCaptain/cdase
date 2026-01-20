@@ -1,3 +1,7 @@
+> **Optional sections are omitted by default.**
+> Include an Optional section only when it adds necessary, concrete information.
+> Empty optional sections MUST NOT be written.
+
 # Function: FUN-XXX <Function Title>
 
 ## 0. Metadata
@@ -16,63 +20,56 @@
 ## 1. Summary (One Paragraph)
 <What capability this function provides, and why it exists.>
 
-## 2. Scope
+## 2. Scope (Optional)
 ### In Scope
 - ...
 
-### Out of Scope
+### Out of Scope (Optional)
 - ...
 
-## 3. Inputs (Enumerated)
+## 3. API / Method
+- `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
+  - Params: ...
+  - Returns: ...
+  - Throws: ...
+  - Notes: ...
+
+### Inputs (Enumerated)
 > Each input must be explicit, typed, constrained, and exemplified.
 
 | Name | Type | Required | Constraints | Example |
 |------|------|----------|-------------|---------|
 |      |      |          |             |         |
 
-## 4. Outputs (Enumerated)
+### Outputs (Enumerated)
 | Name | Type | Guaranteed | Constraints | Example |
 |------|------|------------|-------------|---------|
 |      |      |            |             |         |
 
-## 5. Preconditions & Postconditions
-### Preconditions
+### Preconditions & Postconditions
+#### Preconditions
 - ...
 
-### Postconditions
+#### Postconditions
 - ...
 
-## 6. Acceptance Criteria (Testable Contract)
+## 4. Acceptance Criteria (Testable Contract)
 > MUST be testable. Each AC has stable ID: AC-01, AC-02...
 
 - AC-01: <Given/When/Then style>
 - AC-02: ...
 - AC-03: ...
 
-## 7. Error Handling & Edge Cases
+## 5. Error Handling & Edge Cases (Optional)
 - E-01: <condition> -> <error/behavior>
 - E-02: ...
 
-## 8. API / SPI Contract (Frozen Boundary)
-> API is what callers use. SPI is what this function calls/relies on.
 
-### API (Provided)
-- `<module>.<class>.<method>(<params>) -> <return>`
-  - Params: ...
-  - Returns: ...
-  - Throws: ...
-  - Notes: ...
-
-### SPI (Required/Called)
-- `<module>.<class>.<method>(...) -> ...`
-  - Why needed: ...
-  - Failure strategy: ...
-
-## 9. Design Notes (Optional, but required after Design gate)
+## 6. Design Notes (Optional)
 - Data model notes: ...
 - Sequence notes: ...
 
-## 10. Contract Tests Index (MUST be synced with /tests)
+## 7. Contract Tests Index (MUST be synced with /tests)
 > Tests are derived from Acceptance Criteria. Test names MUST be stable:
 > `test_FUN_XXX_AC_01_<slug>`
 
@@ -85,7 +82,7 @@
 | AC-01 | test_FUN_XXX_AC_01_<slug> | ... | ... | ... |
 | AC-02 | test_FUN_XXX_AC_02_<slug> | ... | ... | ... |
 
-## 11. Gate Checklist (AI MUST enforce)
+## 8. Gate Checklist (AI MUST enforce)
 ### Requirement Gate
 - [ ] Inputs/Outputs complete
 - [ ] ACs are testable and numbered
@@ -107,7 +104,7 @@
 - [ ] All contract tests pass
 - [ ] Trace links complete
 
-## 12. Trace Links (Repo-local, MUST stay valid)
+## 9. Trace Links (Repo-local, MUST stay valid)
 - Feature: `/requirements/feature/FTR-???.md`
 - Sequence: `/design/uml/FTR-???.sequence.puml`
 - Tests: `/tests/contract/test_FUN_XXX.py`
@@ -115,16 +112,17 @@
 - Code Plan: `/requirements/function/FUN-XXX.plan.md`
 - ADR (if any): `/design/adr/ADR-???.md`
 
-## 13. Risks & Non-Breakable Invariants
-- R-01: <risk> (how to detect: <test/log/assert>)
-- INV-01: <must never happen> (how enforced: <test/assert>)
-
-### 14. Version History
+### 10. Version History
 - v0.1
   - Type: Initial | Extension | Breaking
   - Summary:
   - Changed ACs:
   - Introduced Risks:
 
-## 15. Referenced By
+## 11. Referenced By
+
+## 12. Risks & Non-Breakable Invariants (optional)
+- R-01: <risk> (how to detect: <test/log/assert>)
+- INV-01: <must never happen> (how enforced: <test/assert>)
+
 
