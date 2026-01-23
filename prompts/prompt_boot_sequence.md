@@ -390,22 +390,41 @@ After Feature completion:
 ## 11. Phase 9: Task Compilation
 
 ### Input
-
-- Approved and frozen scenario artifact from: Constitution §IV. Documentation-First Reasoning  scenarios folder
+- Approved and frozen scenario artifact (/requirements/scenarios/SCN-XXX.md).
+- Root API Index (/api/api.index.md).
+- Layered API Registries (/api/modules/*.api.md).
 
 ### Actions
+#### 1. Context Discovery Scan
+- Domain Identification: Map scenario requirements to specific system domains (e.g., Auth, Billing).
+- Registry Lookup: Scan /api/api.index.md to locate the relevant Layer Registries.
+- Signature Search: Search the identified /api/modules/*.api.md files for signatures that satisfy the scenario's logic.
 
-- Determine target:
-  - Existing Feature
-  - New Feature
-- Resolve required Functions via documentation
-- Decide:
-  - reuse
-  - new
-  - version evolution
+#### 2. Conflict & Dependency Resolution
+- Case A: Match (Materialized/Stable)
+   - Action: Reference the signature in the Feature’s Depends On metadata.
+   - Strategy: Reuse.
+- Case B: Match (Proposed/In-Progress)
+   - Action: Identify the "Source ID" (the other Feature/Function currently in design).
+   - Strategy: Coordination. The AI MUST prompt the user to confirm dependency on an unmaterialized interface.
+- Case C: No Match
+   - Action: Authorize the creation of a [NEW] Function entry in the Feature's Functional Composition.
+   - Strategy: New Development.
 
-NO execution occurs here.
+#### 3. Target Determination
+- Decide if the requirement extends an Existing Feature or requires a New Feature artifact.
+- Determine if existing Functions require Version Evolution (v0.1 → v0.2) or if a clean implementation is safer.
 
+#### 4. Early Registration (Requirement Lock)
+- Draft the intended API signatures for all [NEW] functions.
+- Action: Immediately update the relevant Layer Registry (/api/modules/*.api.md) with the new signature and set Status: Proposed. This reserves the logic space and prevents parallel duplication.
+
+### Output
+- Compiled task list for the Gate Completion Loop.
+- Updated API Registries with Proposed signatures.
+- Feature/Function metadata populated with validated API dependencies.
+
+**NO execution of source code or test materialization occurs here.**
 ---
 
 ## 12. Phase 10: Gate Completion Loop
@@ -434,26 +453,58 @@ Execution order (STRICT and ENFORCED):
 
 1. Documentation
 2. HARD STOP — User Approval Required
-3. Design Artifacts
+
+3. Design Artifacts  
+   MUST be derived from and consistent with
+   the approved Documentation.
+
 4. HARD STOP — User Approval Required
-5. Tests (automated, executable)
-6. Code Plan
-7. Code (scoped)
+
+5. Tests (automated, executable)  
+   MUST be derived from and consistent with
+   the approved Documentation and Design Artifacts.
+
+6. Code Plan  
+   MUST be derived from and consistent with
+   the approved Documentation, Design Artifacts, and Tests.
+
+7. Code (scoped)  
+   MUST be derived from and strictly conform to
+   the approved Documentation, Design Artifacts, Tests,
+   and the Code Plan.
 
 After the second HARD STOP is approved,
-steps 5–7 (Tests, Code Plan, Code) form a single atomic execution segment
-and MUST NOT be interrupted by additional approval requests.
+steps 5–7 (Tests, Code Plan, Code) form a single
+**atomic execution segment** and MUST NOT be interrupted
+by additional approval requests or execution barriers.
+
 
 ### HARD STOP — User Approval Required
 
-Mandatory execution barrier. Suspend autonomous execution and wait for explicit user input.
+A mandatory execution barrier.
 
-Decision semantics, ownership updates, and resumption rules are defined exclusively in:
+The AI MUST suspend autonomous execution
+and wait for explicit user input.
+
+At a HARD STOP, the user MAY:
+- approve and proceed
+- request changes to existing artifacts
+- reassign ownership
+- stop execution
+
+Subsequent execution MUST be based on
+the latest approved state of all existing artifacts.
+
+Decision semantics, ownership updates,
+and resumption rules are defined exclusively in:
 - Constitution §VII. Stage Gate Enforcement
 
-Record the decision in the run log, then proceed only as permitted by the Constitution.
+All decisions MUST be recorded in the run log.
 
->Artifacts generated in this phase are NOT committed to the repository. Materialization and commit are governed by Constitution §XVIII and occur only in the Delivery State.
+Artifacts generated in this phase are NOT committed
+to the repository. Materialization and commit
+are governed by Constitution §XVIII
+and occur only in the Delivery State.
 
 ---
 

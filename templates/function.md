@@ -14,8 +14,9 @@
 - Priority: <P0|P1|P2>
 - Version: v0.1
 - Last Updated: <YYYY-MM-DD>
-- Depends On: [FUN-???], [FTR-???]
-- Affects: <modules/files list or TBD>
+- Depends On: 
+  - `auth.service.verify`  # Resolved via /api/modules/auth.api.md
+  - `db.repo.save_post`    # Resolved via /api/modules/db.api.md
 
 ## 1. Summary (One Paragraph)
 <What capability this function provides, and why it exists.>
@@ -28,7 +29,9 @@
 - ...
 
 ## 3. API / Method
+> MUST not duplicate existing apis in `\api\`
 - `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
+  - description
   - Params: ...
   - Returns: ...
   - Throws: ...
@@ -83,6 +86,9 @@
 | AC-02 | test_FUN_XXX_AC_02_<slug> | ... | ... | ... |
 
 ## 8. Gate Checklist (AI MUST enforce)
+- [ ] Required APIs discovered in `/api/modules/*.api.md`.
+- [ ] No duplicate logic exists in current API Registries.
+
 ### Requirement Gate
 - [ ] Inputs/Outputs complete
 - [ ] ACs are testable and numbered

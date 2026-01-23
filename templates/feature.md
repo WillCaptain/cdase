@@ -14,14 +14,17 @@
 - Version: v0.1
 - Last Updated: <YYYY-MM-DD>
 - Resolution Status: <Draft | Stable | Deprecated>
-- Depends On: [FTR-???], [FUN-???]
 - Users / Stakeholders: <who benefits>
+- Depends On: 
+  - `auth.service.verify`  # Resolved via /api/modules/auth.api.md
+  - `db.repo.save_post`    # Resolved via /api/modules/db.api.md
 -----------------------------------------------------------------------------------------
 ## 1. API / SPI Contract (Frozen Boundary)
 > API is what callers use. SPI is interface to be implemented for calling back.
-
+> MUST not duplicate existing apis in `\api\`
 ### API (Provided)
 - `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
+  - description: ...
   - Params: ...
   - Returns: ...
   - Throws: ...
@@ -29,6 +32,7 @@
 
 ### SPI (For Implementation)
 - `<module>.<class>.<interface>(...) -> ...` or REST/CLI/SDK event
+  - description: ...
   - Params: ...
   - Returns: ...
   - Throws: ...
@@ -74,9 +78,9 @@
 - ...
 
 ## 7. Functional Composition (Functions)
-> The feature is composed by Functions in a flow order.
-- FUN-001: <title> (role in flow: ...)
-- FUN-002: ...
+> The feature is composed by Functions in a flow order. these functions need to be modified in this feature
+- [REUSE] FUN-001: <title> (role in flow: ...)
+- [NEW] FUN-002: ...
 
 ## 8. Acceptance Criteria (Feature-level)
 > Feature-level ACs verify end-to-end behavior.
@@ -93,6 +97,9 @@
 - Related Function tests: see individual Function documents
 
 ## 11. Gate Checklist (AI MUST enforce)
+- [ ] Required APIs discovered in `/api/modules/*.api.md`.
+- [ ] No duplicate logic exists in current API Registries.
+
 ### Requirement Gate
 - [ ] Flow written and numbered
 - [ ] Feature-level I/O explicit

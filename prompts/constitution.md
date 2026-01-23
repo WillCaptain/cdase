@@ -52,38 +52,37 @@ You must NEVER rely on:
 
 ---
 
-## III. Context Index Principle
-
-To ensure scalability of document-driven reasoning,
-CDASE introduces a Context Index Layer.
+## III. Context & API Discovery Principle
+To ensure the scalability of document-driven reasoning and prevent logic duplication, CDASE utilizes a Layered API Registry as the primary discovery mechanism.
 
 ### Purpose
+The API Registry provides a hierarchical, signature-centric overview of system capabilities. It allows the AI to discover existing logic and resolve dependencies without exhaustive document scans or source code analysis.
 
-The Context Index provides a compact, structured overview
-of Scenarios, Features, and Functions,
-allowing the AI to determine relevance
-before expanding detailed documents.
+### The Registry Hierarchy
+Root Index (`/api/api.index.md`): The entry point mapping system domains to specific Layer Registries.
+
+Layer Registries (`/api/modules/*.api.md`): Domain-specific catalogs containing method signatures (APIs), descriptions, and stability states.
 
 ### Principles
+Discovery First: The AI MUST consult the Root Index and relevant Layer Registries before proposing any new implementation.
 
-- Context Index files are part of the repository and belong to the authoritative project context.
-- Context Index files are optimized for AI parsing, not for narrative reading.
-- Context Index files MUST remain lightweight and MUST NOT duplicate full documentation content.
+Signature Authority: Cross-document dependencies MUST refer to the API Signature string (e.g., package.class.method) found in the registry, rather than just internal document IDs.
 
-### Mandatory Usage
+Context Efficiency: The AI MUST NOT load detailed Feature or Function documents until the necessary API signatures are identified via the Registry.
 
-- The AI MUST consult the Context Index (`scenarios.index.md`, `features.index.md`, `functions.index.md`) before reading any Feature or Function document.
-- The AI MUST NOT perform broad or exhaustive document scans when a relevant entry can be identified via the Context Index.
-- Detailed documents MAY be expanded only after relevance is established through the Context Index.
+### Mandatory Usage (The Discovery Path)
+- Step 1 (Domain Match): Consult `api.index.md` to identify which Layer Registries are relevant to the current requirement.
 
-### Maintenance
+- Step 2 (Signature Match): Scan the identified `/api/module_name/*.api.md` files for signatures that satisfy the logic requirements.
 
-- Context Index files are derived assets.
-- The AI is responsible for keeping Context Index files
-  consistent with Scenario, Feature, and Function artifacts.
-- Updates to Features, Functions, or Scenarios
-  MUST result in corresponding Context Index updates
-  before execution proceeds.
+- Step 3 (Resolution):
+
+  - If a match is found: Reference the signature in the Depends On metadata.
+
+  - If no match is found: Authorize the creation of a [NEW] Function artifact.
+
+### Maintenance & Integrity
+- Consistency: Any change to a Function's signature MUST be atomically updated in its corresponding Layer Registry before the stage gate is closed.
 
 ---
 
@@ -92,15 +91,14 @@ before expanding detailed documents.
 You MUST understand the system in the following strict order:
 
 1. context folder: `/context/*.context.md`
-2. index of scenarios: `/requirements/index/scenarios.index.md`
-3. index of features: `/requirements/index/features.index.md`
-4. index of functions: `/requirements/index/functions.index.md`
-5. scenarios folder: `/requirements/scenarios/*.md`
-6. features folder: `/requirements/features/*.md`
-7. functions folder: `/requirements/functions/*.md`
-8. design folder: `/design/**`
-9. test folder: `/tests/**`
-6. Source code (**ONLY after locating the exact Function ID and entry point**)
+2. root index of apis: `/api/api.index.md`
+3. module api registries: `/api/module_name/*.api.md`
+4. scenarios folder: `/requirements/scenarios/*.md`
+5. features folder: `/requirements/features/*.md`
+6. functions folder: `/requirements/functions/*.md`
+7. design folder: `/design/**`
+8. test folder: `/tests/**`
+9. Source code (**ONLY after locating the exact Function ID and entry point**)
 
 You MUST NOT:
 
@@ -197,19 +195,15 @@ Function documents MUST include:
 
 Undocumented resolution decisions are invalid and MUST be treated as a system failure.
 
-### 5. Mandatory Index Layer
-All Scenario, Feature, and Function artifacts MUST be represented in the Context Index Layer.
+### 5. Mandatory API Registry Layer The API Registry is the authoritative map of all planned and materialized system capabilities.
 
-For each artifact type:
+- Early Registration Rule: An API MUST be registered in the appropriate Layer Registry (/api/modules/*.api.md) as soon as its signature is defined in a Feature's Requirement phase.
 
-- Every Scenario MUST have a corresponding entry in scenarios.index.md
-- Every Feature MUST have a corresponding entry in features.index.md
-- Every Function MUST have a corresponding entry in functions.index.md
-
-Index entries MUST provide a concise, structured explanation sufficient for relevance determination and MUST NOT duplicate full documentation content.
-
-The Context Index Layer is a required part of the production context and MUST be kept consistent with all Scenario, Feature, and Function artifacts.
-
+- Status-Based Visibility: Registries MUST track the lifecycle of an API to inform reuse decisions:
+  - Status: Proposed (Requirement phase: Don't call yet, but logic is reserved)
+  - Status: In-Progress (Development phase: Interface is stable, implementation pending)
+  - Status: Materialized (Accepted: Safe for production consumption)
+  - Status: Frozen (Stable: Interface cannot change)
 
 ## VI. Templates Are Schemas
 
@@ -219,15 +213,14 @@ Templates define:
 
 * Required sections
 * Stable identifiers
-* Indexing rules
+* API Registry rules
 * Traceability structure
 * Stage gate conditions
 
 you will find them in:
-- Scenario index: `cdase/templates/scenario.index.md`
-- Feature index: `cdase/templates/feature.index.md`
-- Function index: `cdase/templates/function.md`
-- Module: `cdase/templates/scenario.md`
+- API index: `cdase/templates/api.index.md`
+- Module API: `cdase/templates/module.api.md`
+- Module: `cdase/templates/module.md`
 - Scenario: `cdase/templates/scenario.md`
 - Feature: `cdase/templates/feature.md`
 - Function: `cdase/templates/function.md`
@@ -280,7 +273,7 @@ If a gate is NOT satisfied:
 * DO NOT proceed
 * Enumerate missing or invalid assets
 * Generate the missing assets
-* Update all related indexes and trace links
+* Update all related api registry and trace links
 * Re-check the gate
 
 You are NOT allowed to bypass, defer, or “temporarily skip” a gate.
@@ -318,7 +311,7 @@ If an Acceptance Gate is NOT satisfied, you MUST:
 - Identify which acceptance artifacts are missing or invalid
   (e.g. acceptance tests, trace links, execution results)
 - Generate or repair the required artifacts
-- Update all related documentation and trace indexes
+- Update all related documentation and api registry
 - Re-run validation
 
 You MUST remain in the current stage until the Acceptance Gate is satisfied
