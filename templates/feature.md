@@ -2,6 +2,7 @@
 > The Stage Ownership table is the single source of truth
 > for execution state, ownership, and task discovery.
 > AI MUST NOT infer stage state from any other fields.
+> all information should be short, concise, accurate
 
 # Feature: FTR-XXX <Feature Title>
 
@@ -14,21 +15,26 @@
 - Version: v0.1
 - Last Updated: <YYYY-MM-DD>
 - Resolution Status: <Draft | Stable | Deprecated>
-- Users / Stakeholders: <who benefits>
 - Depends On: 
-  - `auth.service.verify`  # Resolved via /api/modules/auth.api.md
-  - `db.repo.save_post`    # Resolved via /api/modules/db.api.md
+  - Only APIs defined outside the current Feature scope.
+  - Each dependency MUST be an explicit API address (e.g., package.Class.method) suitable for direct code reference.
+  - Belong Function/Feature Id followed the API address.
+  - **VERY IMPORTANT: Self-dependencies (direct or indirect) are strictly forbidden.**
+
 -----------------------------------------------------------------------------------------
-## 1. API / SPI Contract (Frozen Boundary)
+## 1. Summary (One Paragraph)
+<What user problem it solves and what value it provides.>
+
+## 2. API / SPI Contract (Frozen Boundary)
 > API is what callers use. SPI is interface to be implemented for calling back.
 > MUST not duplicate existing apis in `\api\`
 ### API (Provided)
 - `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
-  - description: ...
+  - description: simply but accurate
   - Params: ...
   - Returns: ...
   - Throws: ...
-  - Notes: ...
+
 
 ### SPI (For Implementation)
 - `<module>.<class>.<interface>(...) -> ...` or REST/CLI/SDK event
@@ -36,11 +42,10 @@
   - Params: ...
   - Returns: ...
   - Throws: ...
-  - Notes: ...
   - Trigger Condition: ...
 -----------------------------------------------------------------------------------------
 
-## 2. Stage Ownership and Execution State
+## 3. Stage Ownership and Execution State
 
 > This table is the single source of truth for Feature execution state.
 
@@ -52,38 +57,23 @@
 | Test         | NotStarted   | -            | -                  | -                  | -                  | -              |
 | Acceptance   | NotStarted   | -            | -                  | -                  | -                  | -              |
 
-
-## 3. Summary (One Paragraph)
-<What user problem it solves and what value it provides.>
-
-## 4. Scope
-### In Scope
-- ...
-
-### Out of Scope
-- ...
-
-## 5. User Journey / Flow (Text)
+## 4. User Journey / Flow (Text)
 > Describe the feature as an ordered flow. Later it must match the sequence diagram.
+> if a step matches a function, put [FUN-XXX] in the step for reference
 1. Step 1 ...
 2. Step 2 ...
 3. Step 3 ...
 
-## 6. Inputs / Outputs (Feature-level)
-> Feature-level I/O can be higher-level than Function I/O, but must be explicit.
-### Inputs
-- ...
-
-### Outputs
-- ...
-
-## 7. Functional Composition (Functions)
+## 5. Functional Composition (Functions)
 > The feature is composed by Functions in a flow order. these functions need to be modified in this feature
-- [REUSE] FUN-001: <title> (role in flow: ...)
-- [NEW] FUN-002: ...
 
-## 8. Acceptance Criteria (Feature-level)
-> Feature-level ACs verify end-to-end behavior.
+| Type | ID | Title | Description | Version |
+|------|----|-------|-------------|--------|
+| [REUSE] | FUN-001 | ... | ... | ...|
+| [NEW] | FUN-002 | .. | .. | .. |
+
+## 6. Acceptance Criteria (Feature-level)
+> Feature-level ACs verify end-to-end behavior, short but accurate
 - FAC-01: Given ... When ... Then ...
 - FAC-02: ...
 
@@ -110,7 +100,6 @@
 - [ ] Sequence diagram covers all steps
 - [ ] Class/package diagram exists (if needed)
 - [ ] All Functions have frozen API/SPI
-- [ ] Trace links valid
 
 ### Development Gate
 - [ ] Each Function has contract tests indexed
@@ -122,9 +111,12 @@
 
 ### Acceptance Gate
 - [ ] FACs verified by executable tests
-- [ ] Trace links valid and complete
 
-## 12. Capability Resolution Log
+## 12. Modification Requests
+> don't add this section if there is not Modification Requests
+- From: FTR-***
+- Requested by: <user>
+- Description: ...
+- Status: Open | Accepted | Rejected
 
-| Step | Capability | Resolution | Function | Version | Notes |
 

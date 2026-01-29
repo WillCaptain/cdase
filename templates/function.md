@@ -1,6 +1,7 @@
 > **Optional sections are omitted by default.**
 > Include an Optional section only when it adds necessary, concrete information.
 > Empty optional sections MUST NOT be written.
+> all information should be short, concise, accurate
 
 # Function: FUN-XXX <Function Title>
 
@@ -15,64 +16,35 @@
 - Version: v0.1
 - Last Updated: <YYYY-MM-DD>
 - Depends On: 
-  - `auth.service.verify`  # Resolved via /api/modules/auth.api.md
-  - `db.repo.save_post`    # Resolved via /api/modules/db.api.md
+  - Only APIs defined outside the current Function scope.
+  - Each dependency MUST be an explicit API address (e.g., package.Class.method) suitable for direct code reference.
+  - Belong Function/Feature Id followed the API address.
+  - **VERY IMPORTANT: Self-dependencies (direct or indirect) are strictly forbidden.**
 
 ## 1. Summary (One Paragraph)
-<What capability this function provides, and why it exists.>
 
-## 2. Scope (Optional)
-### In Scope
-- ...
 
-### Out of Scope (Optional)
-- ...
-
-## 3. API / Method
+## 2. API / Method
 > MUST not duplicate existing apis in `\api\`
 - `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
   - description
   - Params: ...
   - Returns: ...
   - Throws: ...
-  - Notes: ...
 
-### Inputs (Enumerated)
-> Each input must be explicit, typed, constrained, and exemplified.
-
-| Name | Type | Required | Constraints | Example |
-|------|------|----------|-------------|---------|
-|      |      |          |             |         |
-
-### Outputs (Enumerated)
-| Name | Type | Guaranteed | Constraints | Example |
-|------|------|------------|-------------|---------|
-|      |      |            |             |         |
-
-### Preconditions & Postconditions
-#### Preconditions
-- ...
-
-#### Postconditions
-- ...
-
-## 4. Acceptance Criteria (Testable Contract)
+## 3. Acceptance Criteria (Testable Contract)
 > MUST be testable. Each AC has stable ID: AC-01, AC-02...
 
 - AC-01: <Given/When/Then style>
 - AC-02: ...
 - AC-03: ...
 
-## 5. Error Handling & Edge Cases (Optional)
+## 4. Error Handling & Edge Cases (Optional)
 - E-01: <condition> -> <error/behavior>
 - E-02: ...
 
 
-## 6. Design Notes (Optional)
-- Data model notes: ...
-- Sequence notes: ...
-
-## 7. Contract Tests Index (MUST be synced with /tests)
+## 5. Contract Tests Index (MUST be synced with /tests)
 > Tests are derived from Acceptance Criteria. Test names MUST be stable:
 > `test_FUN_XXX_AC_01_<slug>`
 
@@ -85,7 +57,7 @@
 | AC-01 | test_FUN_XXX_AC_01_<slug> | ... | ... | ... |
 | AC-02 | test_FUN_XXX_AC_02_<slug> | ... | ... | ... |
 
-## 8. Gate Checklist (AI MUST enforce)
+## 6. Gate Checklist (AI MUST enforce)
 - [ ] Required APIs discovered in `/api/modules/*.api.md`.
 - [ ] No duplicate logic exists in current API Registries.
 
@@ -108,9 +80,8 @@
 
 ### Acceptance Gate
 - [ ] All contract tests pass
-- [ ] Trace links complete
 
-## 9. Trace Links (Repo-local, MUST stay valid)
+## 7. Trace Links (Repo-local, MUST stay valid)
 - Feature: `/requirements/feature/FTR-???.md`
 - Sequence: `/design/uml/FTR-???.sequence.puml`
 - Tests: `/tests/contract/test_FUN_XXX.py`

@@ -1,9 +1,9 @@
 # User Context
 
 ## Identity
-- Name: Qunhui Zhang
-- Role: Nobody
-- Team: Nothing
+- Name: [user input]
+- Role: [user input](optional)
+- Team: [user input](optional)
 - Organization: Huawei
 
 ## Capabilities

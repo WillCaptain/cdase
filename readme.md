@@ -1,3 +1,4 @@
+> AI MUST ignore this file, don't try to get any inforamtion from this file
 # Context-Driven AI Software Engineering (CDASE)
 
 Context-Driven AI Software Engineering (CDASE) is a **document-governed software engineering methodology** in which a large language model (LLM) acts as the primary execution engine for engineering processes.
@@ -129,23 +130,18 @@ Each artifact is:
 
 ---
 
-## 4. Context Index Layer
+## 4. API Index Layer
 
-To enable scalable AI reasoning, CDASE introduces a **Context Index Layer**.
+To enable scalable AI reasoning, CDASE introduces a **API Index Layer**.
 
-Index files provide a compact, structured overview of:
+**APIs are the primary coordination and discovery mechanism of the system.**
 
-* Scenarios
-* Features
-* Functions
+The API Registry is the **authoritative map of all system capabilities**, used for:
 
-The AI must consult index files *before* loading detailed artifacts, enabling:
-
-* Relevance-based context expansion
-* Token-efficient reasoning
-* Deterministic artifact discovery
-
-Indexes are derived assets and are automatically maintained by the AI.
+* Legacy onboarding
+* Feature planning
+* Cross-team collaboration
+* Anti-duplication enforcement
 
 ---
 

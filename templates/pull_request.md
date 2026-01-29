@@ -1,25 +1,26 @@
-## Linked Assets
+## PR Type (choose ONE)
+
+- [ ] SYNC — status / document / API alignment only
+- [ ] CODE — approved behavior change
+
+---
+
+## Related
 - Feature: FTR-XXX
-- Functions: FUN-XXX, FUN-YYY
-- Code Plan: /requirements/function/FUN-XXX.plan.md
+- Functions (if any): FUN-XXX
 
-## What changed?
-- ...
+---
 
-## Impact scope (files/modules)
-- ...
+## Summary
+- One or two sentences describing what this PR does.
 
-## Gate status (AI checked)
-- Requirement Gate: <Pass/Fail>
-- Design Gate: <Pass/Fail>
-- Development Gate: <Pass/Fail>
-- Test Gate: <Pass/Fail>
-- Context Consistency Check: <Pass/Fail>
+---
 
-## Tests
-- Contract:
-- Regression:
-- Acceptance:
+## Scope
+- [ ] Docs / API / Status only
+- [ ] Code change
 
-## Rollback plan
-- ...
+---
+
+## Declaration
+- [ ] This PR follows feature ownership and gate rules
