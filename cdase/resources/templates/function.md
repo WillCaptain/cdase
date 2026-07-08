@@ -3,10 +3,11 @@
 > Empty optional sections MUST NOT be written.
 > all information should be short, concise, accurate
 
-# Function: FUN-XXX <Function Title>
+# Function: FUN-XXX-YY-ZZ <Function Title>
 
 ## 0. Metadata
-- ID: FUN-XXX
+- ID: FUN-XXX-YY-ZZ
+- FTR ID: FTR-XXX-YY
 - Owner: <name/team>
 - Group/Module: <group>/<module>
 - Stage: <Requirement|Design|Development|Test|Acceptance>
@@ -17,7 +18,7 @@
 - Last Updated: <YYYY-MM-DD>
 - Depends On: 
   - Only APIs defined outside the current Function scope.
-  - Each dependency MUST be an explicit API address (e.g., package.Class.method) suitable for direct code reference.
+  - Each dependency **MUST** be an explicit invokeable API address listed in `/api/modules`.
   - Belong Function/Feature Id followed the API address.
   - **VERY IMPORTANT: Self-dependencies (direct or indirect) are strictly forbidden.**
 
@@ -46,16 +47,16 @@
 
 ## 5. Contract Tests Index (MUST be synced with /tests)
 > Tests are derived from Acceptance Criteria. Test names MUST be stable:
-> `test_FUN_XXX_AC_01_<slug>`
+> `test_FUN_XXX_YY_ZZ_AC_01_<slug>`
 
 ### Test File
-- Path: `/tests/contract/test_FUN_XXX.py` (or language equivalent)
+- Path: `/tests/contract/test_FUN_XXX_YY_ZZ.py` (or language equivalent)
 
 ### Test Cases
 | AC ID | Test Name | Description | Input Set | Expected Output |
 |------|-----------|-------------|-----------|-----------------|
-| AC-01 | test_FUN_XXX_AC_01_<slug> | ... | ... | ... |
-| AC-02 | test_FUN_XXX_AC_02_<slug> | ... | ... | ... |
+| AC-01 | test_FUN_XXX_YY_ZZ_AC_01_<slug> | ... | ... | ... |
+| AC-02 | test_FUN_XXX_YY_ZZ_AC_02_<slug> | ... | ... | ... |
 
 ## 6. Gate Checklist (AI MUST enforce)
 - [ ] Required APIs discovered in `/api/modules/*.api.md`.
@@ -82,12 +83,9 @@
 - [ ] All contract tests pass
 
 ## 7. Trace Links (Repo-local, MUST stay valid)
-- Feature: `/requirements/feature/FTR-???.md`
-- Sequence: `/design/uml/FTR-???.sequence.puml`
-- Tests: `/tests/contract/test_FUN_XXX.py`
+- Tests: `/tests/contract/test_FUN_XXX_YY_ZZ.py`
 - Code Entry: `<module>.<class>.<method>` + file path
-- Code Plan: `/requirements/function/FUN-XXX.plan.md`
-- ADR (if any): `/design/adr/ADR-???.md`
+- Code Plan: `/requirements/function/FUN-XXX_YY_ZZ.plan.md`
 
 ### 10. Version History
 - v0.1

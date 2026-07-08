@@ -4,10 +4,10 @@
 > AI MUST NOT infer stage state from any other fields.
 > all information should be short, concise, accurate
 
-# Feature: FTR-XXX <Feature Title>
+# Feature: FTR-XXX-YY <Feature Title>
 
 ## 0. Metadata
-- ID: FTR-XXX
+- ID: FTR-XXX-YY
 - SCN ID: SCN-XXX
 - Steward: <name/team>   # long-term product/tech owner, NOT stage executor
 - Group/Module: <group>/<module>
@@ -17,7 +17,7 @@
 - Resolution Status: <Draft | Stable | Deprecated>
 - Depends On: 
   - Only APIs defined outside the current Feature scope.
-  - Each dependency MUST be an explicit API address (e.g., package.Class.method) suitable for direct code reference.
+  - Each dependency **MUST** be an explicit invokeable API address listed in `/api/modules`.
   - Belong Function/Feature Id followed the API address.
   - **VERY IMPORTANT: Self-dependencies (direct or indirect) are strictly forbidden.**
 
@@ -59,7 +59,7 @@
 
 ## 4. User Journey / Flow (Text)
 > Describe the feature as an ordered flow. Later it must match the sequence diagram.
-> if a step matches a function, put [FUN-XXX] in the step for reference
+> if a step matches a function, put [FUN-XXX-YY] in the step for reference
 1. Step 1 ...
 2. Step 2 ...
 3. Step 3 ...
@@ -69,8 +69,8 @@
 
 | Type | ID | Title | Description | Version |
 |------|----|-------|-------------|--------|
-| [REUSE] | FUN-001 | ... | ... | ...|
-| [NEW] | FUN-002 | .. | .. | .. |
+| [REUSE] | FUN-001-01-01 | ... | ... | ...|
+| [NEW] | FUN-001-01-02 | .. | .. | .. |
 
 ## 6. Acceptance Criteria (Feature-level)
 > Feature-level ACs verify end-to-end behavior, short but accurate
@@ -78,12 +78,12 @@
 - FAC-02: ...
 
 ## 9. Design Artifacts Index
-- Sequence Diagram: `/design/uml/FTR-XXX.sequence.puml`
-- Package/Class Diagram: `/design/uml/FTR-XXX.class.puml`
+- Sequence Diagram: `/design/uml/FTR-XXX-YY.sequence.puml`
+- Package/Class Diagram: `/design/uml/FTR-XXX-YY.class.puml`
 - ADRs: `/design/adr/ADR-???.md`
 
 ## 10. Test & Acceptance Index
-- Feature-level acceptance tests: `/tests/feature/test_FTR-XXX_*.py`
+- Feature-level acceptance tests: `/tests/feature/test_FTR-XXX-YY_*.py`
 - Related Function tests: see individual Function documents
 
 ## 11. Gate Checklist (AI MUST enforce)

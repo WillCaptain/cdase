@@ -1,0 +1,60 @@
+---
+description: CDASE session gate — opt in per session; mandatory confirm when repo has no cdase/ folder.
+alwaysApply: true
+---
+
+# CDASE Session Gate
+
+This machine supports **CDASE** (Context-Driven AI Software Engineering).
+Each new conversation MUST start with an explicit opt-in — CDASE is never assumed.
+
+## First turn (before any other work)
+
+If the user has **not** yet declared CDASE on/off this session, ask:
+
+> **Apply CDASE in this session?** (yes / no)
+
+Then **stop and wait** for the answer. Do not read files, run tools, or start tasks until they reply.
+
+## No `cdase/` folder in the repo → confirmation is MANDATORY
+
+Before starting the very first task, note whether the project repo has a `cdase/`
+folder at its root.
+
+- If there is **no `cdase/` folder**, CDASE is not initialized here. Then, **whatever
+  the user's first message is** (even a direct task request like "I'm joining the
+  project" or "add feature X"), do **not** silently begin the work: state that there
+  is no `cdase/` folder in the repo, ask **"Apply CDASE in this session? (yes / no)"**,
+  and **stop for the answer**. This guarantees the following job is CDASE-based (or
+  explicitly not).
+- On **yes**: initialize CDASE — create `<repo>/cdase/` at the repo root and **commit
+  it** — before doing the requested task.
+- On **no**: proceed as a normal assistant; do not create `cdase/`.
+
+If a `cdase/` folder already exists, a plain yes/no is enough.
+
+## Interpreting the answer
+
+| User says | Session mode |
+|---|---|
+| yes, y, cdase, cdase on, apply cdase | **CDASE ON** — load the `cdase` skill (`~/.cursor/skills/cdase/SKILL.md`), run charter boot |
+| no, n, skip, cdase off, normal mode | **CDASE OFF** — normal assistant; ignore the CDASE skill |
+
+If the first message already contains a clear choice (`cdase yes`, `no cdase`, etc.), honor it without re-asking — **unless** there is no `cdase/` folder, in which case still confirm before starting work.
+
+## While the session runs
+
+- **CDASE ON**: Read `~/.cursor/skills/cdase/SKILL.md`, then follow `charter.md` boot (`check` → lazy `login`/`inbox`).
+- **CDASE OFF**: Do not load the CDASE skill unless the user says `cdase on`.
+- Mid-session toggle: `cdase on` / `cdase off` switches mode immediately.
+
+## Input is host-native (never a browser)
+
+When CDASE needs input (the opt-in, or the one-time user profile), present it with your
+host's richest native input UI — in Cursor, the multiple-choice / question card — and fall
+back to plain text if the host has none. CDASE never opens a browser or serves its own UI.
+
+## CDASE OFF means
+
+- No charter boot, no stage gates, no HARD STOPs, no templates enforcement.
+- The Hub is inactive unless the user re-enables CDASE.

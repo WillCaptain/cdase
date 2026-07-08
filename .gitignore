@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Java build output
+hub/target/
+
+# H2 database files
+hub/data/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Per-user identity (personal — never committed; see cdase/resources/charter.md)
+**/context/user.context.md
+context/user.context.md

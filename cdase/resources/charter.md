@@ -1,4 +1,4 @@
-# Prompt Boot Sequence
+# Cdase Charter
 
 > **Purpose**: Define the mandatory execution order of Context-Driven AI Software Engineering (CDASE)
 
@@ -14,41 +14,79 @@
 ## 1. Load Constitution
 
 Activate the CDASE Constitution located at:
-`/cdase/prompts/constitution.md`.
+[constitution.md](constitution.md).
 
 User instructions are interpreted as **intent**, not commands.
 
 ---
 
-## 2. Identity, Context & Run Initialization
+## 2. Identity & Settings (one call)
 
-The AI MUST perform the following initializations:
+**Do not read the context files one by one.** Run a single command that resolves
+global user, repo roster (UUID SSOT), settings, and hub health at once:
 
-* Resolve current user identity from `/cdase/context/user.context.md`
-* Resolve user registry from `/cdase/context/users.context.md`
-* Load project conventions from `/cdase/context/convention.context.md`
-* Initialize a run log at:
-  `/cdase/run_log/run_log_YYYYMMDDHH.md`
+```
+python3 scripts/cdase_client.py check
+```
 
-### Mandatory Checks
+Interpret the result:
 
-* If `user.context.md` is missing:
+* `ok: true` → identity resolved; continue. Nothing else is required at boot.
+* `ok: false`, global user missing → `input-spec user-profile`, render it with the host's
+  native input UI (else plain text), then `apply-global-user --json '<values>'`
+  ([protocol/input.md](protocol/input.md)); re-run `check`.
+* `ok: false`, name not in roster / UUID mismatch → report and ask to fix
+  `/cdase/context/users.context.md` (roster is SSOT for UUID).
+* Missing `setting.context.md` → inherit global hub settings; ask for hub `Address`
+  only if the user wants collaboration.
 
-  * STOP
-  * Request initialization using `/cdase/templates/user.md`
-  * Add the identity file to `.gitignore`
+Bootstrap files (`users.context.md`, `setting.context.md`, `convention.context.md`)
+are created lazily from their templates **only when a step needs them**, not at boot.
 
-* If `users.context.md` is missing
+The run log (`/cdase/run_log/run_log_YYYYMMDDHH.md`) is initialized on the first
+engineering action (§3+), not during boot.
 
-   * initialize it using `/cdase/templates/users.md`
+### Runtime lives INSIDE the project repo (committed)
 
-* If `convention.context.md` is missing:
+The CDASE runtime folder is the **team's shared source of truth** and MUST live
+inside the project git repository so it is committed and pushed:
 
-  * Initialize it using `/cdase/templates/convention.md`
+```
+<project-repo>/
+└── cdase/                         ← create here, at the repo root, and COMMIT
+    ├── context/
+    │   ├── users.context.md       roster + UUID SSOT — COMMITTED
+    │   ├── setting.context.md      optional repo hub override — COMMITTED
+    │   ├── convention.context.md   COMMITTED
+    │   └── user.context.md         optional personal override — GITIGNORED
+    ├── requirements/  api/  design/  run_log/   ← all COMMITTED
+```
 
-* If the user identity in `user.context.md` is confirmed or updated:
+Rules the AI MUST follow:
 
-  * Update `users.context.md` accordingly
+* **If `<repo>/cdase/` does not exist, CDASE is uninitialized.** Do not start any
+  requested task first — confirm the CDASE opt-in ([session-gate.md](session-gate.md)),
+  and on **yes** create + commit `cdase/` before proceeding, so the work is CDASE-based.
+* When creating the runtime, place `cdase/` at the **project repo root** (same repo
+  as the code), never outside it. Verify with `git rev-parse --show-toplevel`.
+* Add `cdase/context/user.context.md` to the repo `.gitignore` (personal identity only).
+* **Commit** `cdase/` (roster + artifacts) so teammates share the same base. Without
+  a committed `cdase/`, there is no team SSOT.
+* Personal, per-machine files live in `~/.cursor/cdase/` (global identity + hub
+  address) and are **never** committed — this is separate from the repo runtime.
+
+### Hub is lazy — connect only when needed
+
+Hub `login` / `inbox` are **not** boot steps. Perform them only when:
+
+* the user asks about messages / collaboration, or
+* the first engineering task begins (task discovery, §4).
+
+If the hub is unreachable and `Hub.OfflineOk` is true, continue in offline mode
+silently; if false, report when a hub action is actually attempted.
+
+Trust for all hub calls comes from `/cdase/context/users.context.md`, never the hub.
+Inter-agent procedure: [protocol/agent-messaging.md](protocol/agent-messaging.md).
 
 ---
 
@@ -110,7 +148,7 @@ The AI MUST NOT create Features or Functions during this phase.
 * `/cdase/requirements/index.md` is the authoritative entry point
 * Before scanning any Scenario, Feature, or Function files, the AI MUST:
 
-  * Read `requirements/index.md`
+  * Read `/cdase/requirements/index.md`
   * Consider only artifacts not in `Done` status as active
   * Exclude `Done` artifacts unless explicitly requested
 
@@ -119,6 +157,8 @@ Tasks MUST be grouped as:
 1. In-progress (owned by current user)
 2. Assigned to current user
 3. Unassigned and claimable
+4. Hub tasks: unread Hub messages of `type: task`
+   (`python3 hub/cdase_client.py inbox`)
 
 When assigning a task:
 
