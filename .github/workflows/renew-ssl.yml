@@ -1,0 +1,92 @@
+name: Renew 12th.ai SSL
+
+on:
+  workflow_dispatch:
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      SSH_PORT: ${{ secrets.DEPLOY_PORT }}
+      SSH_USER: ${{ secrets.DEPLOY_USER }}
+    steps:
+      - name: Setup SSH auth
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_PASS: ${{ secrets.DEPLOY_PASS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [[ -n "${DEPLOY_SSH_PRIVATE_KEY:-}" ]]; then
+            echo "$DEPLOY_SSH_PRIVATE_KEY" | tr -dc 'A-Za-z0-9+/=' > ~/.ssh/id_rsa_b64
+            base64 -d ~/.ssh/id_rsa_b64 > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            rm -f ~/.ssh/id_rsa_b64
+            echo "AUTH=key" > ~/.ssh/auth_mode
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq sshpass
+            echo "AUTH=pass" > ~/.ssh/auth_mode
+            test -n "${DEPLOY_PASS:-}"
+          fi
+
+      - name: Renew certificate
+        env:
+          DEPLOY_PASS: ${{ secrets.DEPLOY_PASS }}
+        run: |
+          set -euo pipefail
+          PORT="${SSH_PORT:-22}"
+          HOST="${SSH_HOST:?}"
+          USER="${SSH_USER:?}"
+          MODE=$(cat ~/.ssh/auth_mode)
+          if [[ "$MODE" == "key" ]]; then
+            SSH=(ssh -i ~/.ssh/id_rsa -p "$PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
+          else
+            SSH=(sshpass -p "$DEPLOY_PASS" ssh -p "$PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
+          fi
+
+          "${SSH[@]}" "${USER}@${HOST}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "=== before ==="
+          certbot certificates 2>&1 || true
+          date -u
+
+          if ! command -v certbot >/dev/null 2>&1; then
+            if command -v dnf >/dev/null 2>&1; then
+              dnf install -y certbot python3-certbot-nginx
+            elif command -v yum >/dev/null 2>&1; then
+              yum install -y certbot python3-certbot-nginx
+            else
+              apt-get update -qq && apt-get install -y -qq certbot python3-certbot-nginx
+            fi
+          fi
+
+          # Prefer renew; if no live cert, issue for 12th.ai
+          if certbot certificates 2>/dev/null | grep -q 'Certificate Name'; then
+            certbot renew --nginx --non-interactive --agree-tos --force-renewal
+          else
+            certbot --nginx -d 12th.ai -d www.12th.ai --non-interactive --agree-tos \
+              --register-unsafely-without-email --redirect || \
+            certbot --nginx -d 12th.ai --non-interactive --agree-tos \
+              --register-unsafely-without-email --redirect
+          fi
+
+          nginx -t
+          nginx -s reload
+          echo "=== after ==="
+          certbot certificates 2>&1 || true
+          echo | openssl s_client -connect 127.0.0.1:443 -servername 12th.ai 2>/dev/null \
+            | openssl x509 -noout -dates -subject || true
+          REMOTE
+
+      - name: Verify public HTTPS
+        run: |
+          set -euo pipefail
+          sleep 2
+          # Must succeed WITHOUT -k after renew
+          curl -sS --max-time 20 https://12th.ai/cdase/health | tee /tmp/h.json
+          grep -q '"ok":true' /tmp/h.json
+          echo
+          echo "SSL OK"
