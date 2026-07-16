@@ -1,0 +1,96 @@
+name: Deploy CDASE Hub
+
+on:
+  push:
+    paths:
+      - "hub/**"
+      - ".github/workflows/deploy-hub.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hub-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      SSH_PORT: ${{ secrets.DEPLOY_PORT }}
+      SSH_USER: ${{ secrets.DEPLOY_USER }}
+      REMOTE_DIR: /cdase-hub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build hub jar
+        run: mvn -q -f hub/pom.xml package -DskipTests
+
+      - name: Setup SSH auth
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_PASS: ${{ secrets.DEPLOY_PASS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [[ -n "${DEPLOY_SSH_PRIVATE_KEY:-}" ]]; then
+            # Same encoding approach as WillCaptain/12th deploy workflow
+            echo "$DEPLOY_SSH_PRIVATE_KEY" | tr -dc 'A-Za-z0-9+/=' > ~/.ssh/id_rsa_b64
+            base64 -d ~/.ssh/id_rsa_b64 > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            rm -f ~/.ssh/id_rsa_b64
+            ssh-keygen -l -f ~/.ssh/id_rsa
+            echo "AUTH=key" > ~/.ssh/auth_mode
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq sshpass
+            echo "AUTH=pass" > ~/.ssh/auth_mode
+            test -n "${DEPLOY_PASS:-}"
+          fi
+
+      - name: Deploy to server
+        env:
+          DEPLOY_PASS: ${{ secrets.DEPLOY_PASS }}
+        run: |
+          set -euo pipefail
+          PORT="${SSH_PORT:-22}"
+          HOST="${SSH_HOST:?DEPLOY_HOST secret required}"
+          USER="${SSH_USER:?DEPLOY_USER secret required}"
+          DIR="$REMOTE_DIR"
+          MODE=$(cat ~/.ssh/auth_mode)
+
+          if [[ "$MODE" == "key" ]]; then
+            SSH=(ssh -i ~/.ssh/id_rsa -p "$PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
+            SCP=(scp -i ~/.ssh/id_rsa -P "$PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
+          else
+            SSH=(sshpass -p "$DEPLOY_PASS" ssh -p "$PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
+            SCP=(sshpass -p "$DEPLOY_PASS" scp -P "$PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
+          fi
+
+          "${SSH[@]}" "${USER}@${HOST}" "mkdir -p $DIR/data $DIR/logs"
+          "${SCP[@]}" hub/target/cdase-hub-1.0.0.jar "${USER}@${HOST}:${DIR}/cdase-hub.jar"
+          "${SCP[@]}" \
+            hub/deploy/start.sh \
+            hub/deploy/stop.sh \
+            hub/deploy/nginx-cdase.conf \
+            hub/deploy/remote-install-nginx.sh \
+            "${USER}@${HOST}:${DIR}/"
+          "${SSH[@]}" "${USER}@${HOST}" "chmod +x $DIR/start.sh $DIR/stop.sh $DIR/remote-install-nginx.sh"
+          "${SSH[@]}" "${USER}@${HOST}" "bash $DIR/remote-install-nginx.sh $DIR"
+          "${SSH[@]}" "${USER}@${HOST}" "cd $DIR && ./stop.sh; ./start.sh; sleep 2; curl -sf http://127.0.0.1:7423/health; echo"
+
+      - name: Public health check
+        run: |
+          set -euo pipefail
+          sleep 2
+          code=$(curl -sS -o /tmp/h.json -w '%{http_code}' "http://${SSH_HOST}/cdase/health" || true)
+          echo "HTTP $code"
+          cat /tmp/h.json || true
+          test "$code" = "200"

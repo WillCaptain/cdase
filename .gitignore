@@ -7,6 +7,9 @@ hub/target/
 # H2 database files
 hub/data/
 
+# Deploy credentials (never commit)
+hub/deploy/.env
+
 # Python cache
 __pycache__/
 *.pyc
