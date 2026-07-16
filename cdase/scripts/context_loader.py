@@ -1,4 +1,9 @@
-"""Load CDASE identity, roster, and settings — global user config + repo SSOT."""
+"""Load CDASE identity, roster, and settings — global user config + repo SSOT.
+
+Identity model: **machine = user**. Hub/roster uuid is derived from this machine
+(`machine_user_id`). Display Name comes from the roster row for this machine, or
+from ~/.cdase/user.context.md when joining a repo for the first time.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +11,7 @@ import os
 import re
 from pathlib import Path
 
-DEFAULT_HUB_URL = "http://127.0.0.1:7423"
+DEFAULT_HUB_URL = "https://12th.ai/cdase"
 
 USER_ID_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 LEGACY_UUID_RE = re.compile(
@@ -14,8 +19,57 @@ LEGACY_UUID_RE = re.compile(
 )
 
 
-def global_cdase_dir() -> Path:
-    return Path(os.environ.get("CDASE_GLOBAL", Path.home() / ".cursor" / "cdase")).expanduser()
+# Agent-neutral global config (not tied to Cursor or any IDE).
+# Windows: %USERPROFILE%\.cdase  (Path.home() / ".cdase")
+DEFAULT_GLOBAL_CDASE_DIR = Path.home() / ".cdase"
+LEGACY_GLOBAL_CDASE_DIR = Path.home() / ".cursor" / "cdase"
+_GLOBAL_MIGRATE_NAMES = ("user.context.md", "setting.context.md")
+
+
+def migrate_legacy_global_dir(
+    preferred: Path | None = None,
+    legacy: Path | None = None,
+) -> list[str]:
+    """Copy missing files from ~/.cursor/cdase → ~/.cdase (one-way, non-destructive).
+
+    Returns list of filenames copied. Never overwrites files already in preferred.
+    """
+    preferred = (preferred or DEFAULT_GLOBAL_CDASE_DIR).expanduser()
+    legacy = (legacy or LEGACY_GLOBAL_CDASE_DIR).expanduser()
+    if not legacy.is_dir():
+        return []
+    copied: list[str] = []
+    for name in _GLOBAL_MIGRATE_NAMES:
+        src = legacy / name
+        dst = preferred / name
+        if src.is_file() and not dst.exists():
+            preferred.mkdir(parents=True, exist_ok=True)
+            dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            copied.append(name)
+    return copied
+
+
+def global_cdase_dir(*, for_write: bool = False) -> Path:
+    """Resolve global CDASE config dir (agent-neutral).
+
+    Priority:
+      1. CDASE_GLOBAL env
+      2. ~/.cdase (canonical — always used for writes / new installs)
+      3. ~/.cursor/cdase (legacy read fallback if ~/.cdase is absent)
+
+    On access, missing files are migrated from legacy → ~/.cdase (never overwrite).
+    Windows canonical: %USERPROFILE%\\.cdase
+    """
+    if env := os.environ.get("CDASE_GLOBAL"):
+        return Path(env).expanduser()
+    preferred = DEFAULT_GLOBAL_CDASE_DIR.expanduser()
+    legacy = LEGACY_GLOBAL_CDASE_DIR.expanduser()
+    migrate_legacy_global_dir(preferred, legacy)
+    if for_write:
+        return preferred
+    if preferred.exists() or not legacy.exists():
+        return preferred
+    return legacy
 
 
 def is_valid_user_id(value: str) -> bool:
@@ -78,6 +132,9 @@ def _apply_settings_sections(settings: dict, sections: dict[str, dict[str, str]]
         settings["auto_reply_to_agent_questions"] = _read_bool(
             messaging.get("autoreplytoagentquestions"), True
         )
+    project = sections.get("project", {})
+    if project.get("repoid"):
+        settings["repo_id"] = project["repoid"].strip()
 
 
 def load_settings(cdase_root: Path) -> dict:
@@ -124,6 +181,26 @@ def resolve_hub_url(settings: dict) -> str:
     return settings["hub_address"].rstrip("/")
 
 
+def hub_url_state(settings: dict) -> dict:
+    """Hub tools allowed only when Address is explicitly configured (not built-in default alone)."""
+    sources = settings.get("sources", [])
+    explicit = (
+        "global" in sources
+        or "repo" in sources
+        or "CDASE_HUB_URL" in sources
+    )
+    url = (settings.get("hub_address") or "").strip().rstrip("/")
+    empty = not url or url.startswith("[")
+    configured = explicit and not empty
+    return {
+        "configured": configured,
+        "explicit": explicit,
+        "address": url if configured else None,
+        "hub_tools_allowed": configured,
+        "source": settings.get("source"),
+    }
+
+
 def resolve_client_script(settings: dict, scripts_dir: Path) -> Path:
     path = settings.get("client_path", "auto")
     if not path or path.lower() == "auto":
@@ -151,47 +228,78 @@ def _overlay_user(base: dict, overlay: dict) -> dict:
     return merged
 
 
+def global_user_name() -> str | None:
+    path = global_cdase_dir() / "user.context.md"
+    if not path.exists():
+        return None
+    return _read_field(path.read_text(encoding="utf-8"), "Name")
+
+
 def resolve_identity_from_roster(user: dict, roster: list[dict]) -> dict:
-    """UUID SSOT is repo roster — resolve by Name (option B)."""
-    if not user.get("name") or not roster:
-        return user
-    match = next((m for m in roster if m["name"].lower() == user["name"].lower()), None)
+    """Resolve by machine-derived user id in roster (not by Name)."""
+    from machine_identity import machine_user_id, raw_machine_id
+
+    uid = user.get("uuid") or machine_user_id()
+    user["uuid"] = normalize_user_id(uid) if is_valid_user_id(uid) else uid
+    user["machine_id"] = raw_machine_id()
+    user["uuid_from_machine"] = True
+
+    match = next((m for m in roster if m.get("uuid") == user["uuid"]), None)
     if match is None:
         return user
-    if not user.get("role"):
+    # Repo roster Name wins for this project (may differ from global Name)
+    user["name"] = match.get("name") or user.get("name")
+    if match.get("role"):
         user["role"] = match.get("role")
-    explicit = user.get("uuid")
-    if explicit and is_valid_user_id(explicit):
-        user["uuid_explicit"] = True
-        return user
-    user["uuid"] = match["uuid"]
     user["uuid_from_roster"] = True
     return user
 
 
 def load_user_context(cdase_root: Path) -> dict:
-    """Load identity: global profile → optional repo override → env → roster UUID."""
-    user: dict = {"name": None, "uuid": None, "role": None, "team": None, "organization": None}
-    identity_sources: list[str] = []
+    """Load identity: machine user id + global Name fallback + roster row for this machine."""
+    from machine_identity import machine_user_id, raw_machine_id
+
+    user: dict = {
+        "name": None,
+        "uuid": machine_user_id(),
+        "machine_id": raw_machine_id(),
+        "role": None,
+        "team": None,
+        "organization": None,
+        "uuid_from_machine": True,
+    }
+    identity_sources: list[str] = ["machine"]
 
     global_path = global_cdase_dir() / "user.context.md"
     if global_path.exists():
-        user = _overlay_user(user, _read_user_file(global_path))
+        overlay = _read_user_file(global_path)
+        # Global Name is display default only — never take a random UUID from global file
+        if overlay.get("name"):
+            user["name"] = overlay["name"]
+        if overlay.get("role"):
+            user["role"] = overlay["role"]
+        if overlay.get("team"):
+            user["team"] = overlay["team"]
+        if overlay.get("organization"):
+            user["organization"] = overlay["organization"]
         identity_sources.append("global")
 
     repo_path = cdase_root / "context" / "user.context.md"
     if repo_path.exists():
-        user = _overlay_user(user, _read_user_file(repo_path))
+        overlay = _read_user_file(repo_path)
+        if overlay.get("name"):
+            user["name"] = overlay["name"]
+        if overlay.get("role"):
+            user["role"] = overlay["role"]
         identity_sources.append("repo_override")
 
     if env_name := os.environ.get("CDASE_USER"):
         user["name"] = env_name
         identity_sources.append("CDASE_USER")
-    if env_uuid := os.environ.get("CDASE_UUID"):
-        if is_valid_user_id(env_uuid):
-            user["uuid"] = normalize_user_id(env_uuid)
-            user["uuid_explicit"] = True
-            identity_sources.append("CDASE_UUID")
+    if env_mid := os.environ.get("CDASE_MACHINE_ID"):
+        user["machine_id"] = env_mid
+        user["uuid"] = machine_user_id(env_mid)
+        identity_sources.append("CDASE_MACHINE_ID")
 
     roster = load_roster(cdase_root)
     user = resolve_identity_from_roster(user, roster)
@@ -210,13 +318,15 @@ def load_roster(cdase_root: Path) -> list[dict]:
     roster: list[dict] = []
     for line in path.read_text().splitlines():
         line = line.strip()
-        if not line.startswith("|") or line.startswith("|--") or "UUID" in line:
+        if not line.startswith("|") or line.startswith("|--"):
+            continue
+        if "UUID" in line and "Name" in line:
             continue
         parts = [p.strip() for p in line.strip("|").split("|")]
         if len(parts) < 2:
             continue
         name, user_uuid = parts[0], parts[1]
-        if not name or name.startswith("-"):
+        if not name or name.startswith("-") or name.lower() == "name":
             continue
         if not is_valid_user_id(user_uuid):
             continue
@@ -240,29 +350,23 @@ def validate_identity(user: dict, roster: list[dict]) -> tuple[bool, list[str]]:
     if not roster:
         errors.append("context/users.context.md missing or empty — repo roster is SSOT for trust")
 
-    if not user.get("name"):
-        errors.append(
-            f"identity name missing — set Name in {gdir}/user.context.md (once, global) "
-            "or CDASE_USER"
-        )
-
-    if user.get("name") and roster:
-        match = next((m for m in roster if m["name"].lower() == user["name"].lower()), None)
+    uid = user.get("uuid")
+    if not uid or not is_valid_user_id(uid):
+        errors.append("machine user id missing/invalid — check CDASE_MACHINE_ID / machine_identity")
+    else:
+        match = next((m for m in roster if m.get("uuid") == normalize_user_id(uid)), None)
         if match is None:
             errors.append(
-                f"name '{user['name']}' not in repo roster (users.context.md) — add them or use a repo override"
+                f"machine user id '{uid}' not in repo roster (users.context.md) — "
+                "run boot to add this machine, or set Name globally first"
             )
-        else:
-            if not user.get("uuid"):
-                errors.append(
-                    f"uuid not resolved for '{user['name']}' — roster entry required in users.context.md"
-                )
-            elif not is_valid_user_id(user["uuid"]):
-                errors.append(f"identity uuid invalid format: {user['uuid']}")
-            elif normalize_user_id(user["uuid"]) != match["uuid"]:
-                errors.append(
-                    f"uuid mismatch for '{user['name']}': resolved={user['uuid']} roster={match['uuid']}"
-                )
+        elif not match.get("name") and not user.get("name"):
+            errors.append("roster row has no Name for this machine")
+
+    if not user.get("name"):
+        errors.append(
+            f"display Name missing — set Name in {gdir}/user.context.md or roster row for this machine"
+        )
 
     return len(errors) == 0, errors
 

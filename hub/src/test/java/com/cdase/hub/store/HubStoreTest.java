@@ -68,4 +68,15 @@ class HubStoreTest {
         assertEquals(1, store.listUsers().size());
         assertEquals("alice", store.listUsers().get(0).get("name"));
     }
+
+    @Test
+    void listUsersScopedByRepoId() throws Exception {
+        store.login(ALICE, "alice", "m1", "github.com/org/project-a", Map.of());
+        store.login(BOB, "bob", "m2", "github.com/org/project-b", Map.of());
+
+        assertEquals(1, store.listUsers("github.com/org/project-a").size());
+        assertEquals("alice", store.listUsers("github.com/org/project-a").get(0).get("name"));
+        assertEquals(1, store.listUsers("github.com/org/project-b").size());
+        assertEquals("bob", store.listUsers("github.com/org/project-b").get(0).get("name"));
+    }
 }

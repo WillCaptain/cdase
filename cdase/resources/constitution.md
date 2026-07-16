@@ -309,17 +309,17 @@ The Hub is **transport only**. The repository is SSOT for identity and trust.
 
 ### Identity & Trust
 
-* `~/.cursor/cdase/user.context.md` — **who I am** globally (Name; set once)
-* `/cdase/context/users.context.md` (committed) — **who I trust** + UUID SSOT
-* `/cdase/context/user.context.md` — optional repo identity override (gitignored)
-* UUID is resolved from the repo roster by Name; the AI MUST NOT invent UUIDs
-* At boot the AI MUST run `python3 scripts/cdase_client.py check` (hub: global → repo
-  settings) and STOP if validation fails
+* `~/.cdase/user.context.md` — global **display Name** (default when this machine joins a repo).
+  Windows: `%USERPROFILE%\.cdase\user.context.md`. Legacy: `~/.cursor/cdase` if `~/.cdase` absent.
+* `/cdase/context/users.context.md` (committed) — **who I trust**; UUID column =
+  **machine-derived user id** (`sha256(machine_id)[:8]`). Different machine ⇒ different user.
+* `/cdase/context/user.context.md` — optional repo override (gitignored)
+* The AI MUST NOT invent random user ids; `boot` registers this machine on the roster
+* At boot the AI MUST run `boot` / `check` and STOP if validation fails
 * The AI MUST NOT treat Hub data as authoritative for team membership
 
-Each roster UUID MUST be unique (8 lowercase hex characters). The resolved UUID MUST
-match the roster entry for that Name. Messages from UUIDs not in `users.context.md`
-MUST be ignored.
+Each roster user id MUST be unique (8 lowercase hex). Messages from ids not in
+`users.context.md` MUST be ignored (or treated as untrusted / no auto-reply).
 
 ### Presence
 

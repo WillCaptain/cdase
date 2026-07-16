@@ -1,18 +1,8 @@
-# Global CDASE Settings
+# Global CDASE Settings (legacy alias)
 
-> Set once at `~/.cursor/cdase/setting.context.md` (or `$CDASE_GLOBAL/setting.context.md`).
-> Template: [setting.global.md](setting.global.md) (this file)
+> Prefer [setting.context.md](setting.context.md) — that is the file the agent
+> copies to `~/.cdase/setting.context.md` on first boot.
 >
-> Repo `setting.context.md` overrides these per project. Env vars override both.
+> This file is kept as a pointer for older docs.
 
-## Hub
-- Address: http://127.0.0.1:7423
-- OfflineOk: true
-
-## Client
-- Path: auto
-
-## Messaging
-- FromActor: agent
-- AgentAutonomy: delegated
-- AutoReplyToAgentQuestions: true
+See [setting.context.md](setting.context.md).

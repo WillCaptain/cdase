@@ -1,10 +1,12 @@
 # Global User Profile
 
-> Set once at `~/.cursor/cdase/user.context.md` (or `$CDASE_GLOBAL/user.context.md`).
+> Set once at `~/.cdase/user.context.md` (or `$CDASE_GLOBAL/user.context.md`).
+> Windows: `%USERPROFILE%\.cdase\user.context.md`. Legacy: `~/.cursor/cdase` if `~/.cdase` absent.
 > Template: [user.global.md](user.global.md) (this file)
 >
-> **UUID comes from the repo roster** — match by `Name` in each project's
-> `users.context.md`. Do not duplicate UUID here unless using a repo override.
+> **User id = this machine** (`sha256(machine_id)[:8]` in each repo roster).
+> `Name` here is the default display name when this machine first joins a repo.
+> Per-repo Name in `users.context.md` may differ without changing this file.
 
 ## Identity
 - Name: [your name]

@@ -21,7 +21,7 @@ Accountability stays with the human on the roster. `from_actor` marks **who enga
 |---|---|
 | Files under git repository root (committed **or** local unpushed) | **Yes** |
 | `/cdase/**` artifacts, API docs, requirements, design | **Yes** |
-| Environment secrets, `~/.cursor/cdase`, paths outside repo, private notes | **No** — STOP, ask user |
+| Environment secrets, `~/.cdase` (or legacy `~/.cursor/cdase`), paths outside repo, private notes | **No** — STOP, ask user |
 
 `send-file` enforces repo boundary in the client. Free-text `send` runs a best-effort secret/path scan; blocked unless user approves (`--user-approved`).
 
@@ -110,6 +110,81 @@ Before send:
 4. Set `from_actor: agent` and appropriate `intent` + `thread_id`
 
 Human `@someone` or "tell X …" → `from_actor: human`.
+
+## Team discovery ("who is on this project?")
+
+**Never use git history** for CDASE team identity. Git authors ≠ roster users.
+
+### Procedure (agent)
+
+1. `python3 scripts/cdase_client.py team` — also auto-refreshes your hub presence (ping or login).
+2. Present merged list (**primary**):
+
+| `status` | Meaning |
+|---|---|
+| `online` | In committed roster **and** active on hub (recent `login`/`ping`) |
+| `offline` | In roster but not active on hub |
+| `hub_only` | On hub but **not** in committed `users.context.md` — often unpushed roster |
+
+3. **Last (supplementary):** `git_contributors` — git authors **not** in roster. FYI only; **not** CDASE team members. Show after CDASE members.
+
+## Trust model (repo SSOT + hub superset)
+
+| Layer | Role |
+|---|---|
+| **`users.context.md`** (repo) | **Trust SSOT** — who user_b accepts; UUIDs for send/inbox trust |
+| **Hub users** (login) | **Superset** — anyone active on hub, including users not yet in repo |
+| **Hub messages** | All stored; client fetches with `trust=all` and classifies |
+
+### User list (`team`)
+
+| `status` | Meaning |
+|---|---|
+| `online` / `offline` | In **your** roster |
+| `new_to_you` | On hub, **not** in your `users.context.md` — ask user to confirm before trusting |
+
+### Messages (`sync` / `inbox`)
+
+| `status` | Agent may auto-reply? |
+|---|---|
+| `trusted` | Yes (if `AgentAutonomy: delegated`) |
+| `unknown_sender` | **No** — show message; user must confirm sender is safe and add to roster |
+
+**Rule:** If **will** messages **evan** but will is not in evan's roster yet → evan's agent shows the message and asks evan to confirm — **no automatic reply** to will's agent until evan adds will to `users.context.md`.
+
+### Sources
+
+### `repo_id` resolution (client)
+
+1. `Project.RepoId` in `cdase/context/setting.context.md` (committed, preferred)
+2. `CDASE_REPO_ID` env override
+3. Normalized `git remote get-url origin` (e.g. `github.com/org/aintegration`)
+4. Git repo directory name (fallback)
+
+Every `login` / `ping` / `team` sends `repo_id` so hub presence is **per project**, not global.
+
+```bash
+# hub API (client wraps this)
+GET /users?repo_id=github.com/org/aintegration
+POST /login  { "uuid", "name", "machine_id", "repo_id", "trust" }
+```
+
+### Sources (roster vs hub)
+
+Example: **will** works locally in repo A but has not pushed `users.context.md`.
+**even** in repo B runs `team`:
+
+* will is **not** in even's roster file (not pushed),
+* will **may** appear as `hub_only` + `online` if will used any hub command on the same hub (presence auto-refreshes).
+
+After will pushes roster, both machines see will in roster.
+
+```bash
+python3 scripts/cdase_client.py team   # refreshes your presence automatically
+```
+
+Hub-touching commands (`check`, `team`, `send`, `inbox`, …) ping or login before the main
+action so teammates see you online without a separate heartbeat step.
 
 ## CLI reference
 

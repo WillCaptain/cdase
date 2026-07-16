@@ -16,37 +16,55 @@ You are the **engineering execution system** of a document-governed repository.
 
 ## Boot (lean — reach the user fast)
 
+**Zero-to-start journey** (user says "I'm joining the project"):
+
+| Step | Agent |
+|------|-------|
+| 1 | Code/repo workspace **or** strongly code-related question | Ask "Apply CDASE?" — **stop**. Skip ask for papers / non-code work. |
+| 2 | `input-spec user-profile` → `apply-global-user` (Name). `boot` registers **this machine** on `users.context.md` (machine = user id). |
+| 3 | Missing `~/.cdase/setting.context.md` → `boot` / `init-global-setting` copies skill `templates/setting.context.md` (default `https://12th.ai/cdase`). Custom URL only if user asks. |
+| 4 | `sync` — activate on hub + retrieve messages |
+| 5–6 | Still no URL → **no** sync/team/send/inbox until setting exists |
+| 7 | User asks to list users → `team` |
+
+Progress: `python3 scripts/cdase_client.py boot`
+
 1. [resources/session-gate.md](resources/session-gate.md) — ask "Apply CDASE?" and **stop** for the answer.
-   - If the repo has **no `cdase/` folder**, this opt-in is mandatory and cannot be skipped —
-     ask it even if the user's first message is a task request, so the work is CDASE-based.
+   - Run `discover` when workspace layout is unclear ([protocol/repo-resolution.md](resources/protocol/repo-resolution.md)).
+   - **Never** bootstrap consumer `cdase/` in the framework repo (`cdase/SKILL.md`).
+   - If no consumer `cdase/context/` in the **app** repo, opt-in is mandatory before any task.
 2. On **yes**: read [resources/constitution.md](resources/constitution.md) + [resources/charter.md](resources/charter.md).
-   - If `<repo>/cdase/` is absent, initialize and commit it (charter §2) before the task.
-3. Run **one** command — it resolves identity, roster, settings, and hub health in a single call:
+   - `discover` → select application repo(s). **2b**: all repos (same user) or none.
+     **2c**: confirm identity, then all-or-none for missing repos. Set `CDASE_ROOT` for active work.
+3. On **every user question** in CDASE mode (after hub URL is set), run **sync** before answering:
    ```
-   python3 scripts/cdase_client.py check
+   python3 scripts/cdase_client.py sync
    ```
-   * `ok: false` with missing global user → `input-spec user-profile`, render natively (Cursor card) or text, then `apply-global-user` ([protocol/input.md](resources/protocol/input.md)).
-   * `ok: true` → continue.
+   Hub health + **inbox** (messages). Show `hub_warning` if hub is down.
+4. Boot once with **`check`** or **`boot`** (identity + hub URL state + next step).
+   * `ok: false` with missing global user → `input-spec user-profile`, then `apply-global-user`.
+   * `hub_tools_blocked` → run `boot` / `init-global-setting` (copies template). Ask `hub-address` only for a non-default hub.
+   * `unread_count > 0` from sync → show messages before answering.
 
-**Defer everything else until it's actually needed** (do NOT do at boot):
-- `login` / `inbox` — only when the user collaborates or on first engineering task.
-- Reference and protocol docs ([reference.md](resources/reference.md), [protocol/](resources/protocol/)) — read on demand.
-- Run log, repo sync, task discovery — start when engineering intent appears (charter §3+).
+**Hub model:** repo owns **users** (`users.context.md`); hub stores presence + messages.
 
-> Do not open the per-file context docs individually at boot — `check` already reads them.
-> `/cdase/` = consumer project's cdase folder (runtime). Skill = `SKILL.md` + `resources/` + `scripts/`.
+**Identity:** **machine = user**. Roster/hub id = `sha256(machine_id)[:8]`. Different machine ⇒ different user. Global `Name` is display default when this machine first joins a repo; repo roster Name may differ later.
+
+> Do not open the per-file context docs individually at boot — `check` / `boot` already read them.
+> Consumer runtime = `<app-repo>/cdase/` (with `context/`). Skill package = `SKILL.md` + `resources/` + `scripts/` in the framework repo — not the runtime.
 
 ## Config layers
 
 ```
-~/.cursor/cdase/              ← you (global, set once)
-  user.context.md             Name, preferences
-  setting.context.md          default hub address
+~/.cdase/                     ← global (all agents on this machine)
+                              Windows: %USERPROFILE%\.cdase
+  user.context.md             display Name (default when joining a repo)
+  setting.context.md          hub Address (seeded from skill template)
 
-my-app/cdase/context/         ← this repo
-  users.context.md            roster + UUID SSOT (committed)
+my-app/cdase/context/         ← this repo (team)
+  users.context.md            Name | machine-user-id | Role  (committed trust SSOT)
   setting.context.md          optional overrides (committed)
-  user.context.md             optional identity override (gitignored)
+  user.context.md             optional override (gitignored)
 ```
 
 ## Standard skill layout

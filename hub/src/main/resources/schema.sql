@@ -49,3 +49,14 @@ CREATE TABLE IF NOT EXISTS kb_entries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_kb_updated ON kb_entries(updated_at);
+
+CREATE TABLE IF NOT EXISTS project_sessions (
+    user_uuid  VARCHAR(36) NOT NULL,
+    repo_id    VARCHAR(512) NOT NULL,
+    machine_id VARCHAR(255) NOT NULL,
+    last_seen  TIMESTAMP NOT NULL,
+    CONSTRAINT pk_project_sessions PRIMARY KEY (user_uuid, repo_id, machine_id),
+    CONSTRAINT fk_project_sessions_user FOREIGN KEY (user_uuid) REFERENCES users(user_uuid) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_sessions_repo ON project_sessions(repo_id, last_seen);

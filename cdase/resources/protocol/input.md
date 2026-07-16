@@ -28,54 +28,44 @@ Text is the universal floor — functionality is never lost, only the richer car
 
 ```bash
 python3 scripts/cdase_client.py input-spec session-gate
+python3 scripts/cdase_client.py input-spec user-scope
 python3 scripts/cdase_client.py input-spec user-profile
+python3 scripts/cdase_client.py input-spec user-profile-repo
+python3 scripts/cdase_client.py input-spec hub-address
 ```
 
-Returns a host-agnostic spec, e.g. `user.profile`:
+## Identity: global vs this-repo (mandatory clarity)
 
-```json
-{
-  "preset": "user.profile",
-  "kind": "form",
-  "title": "Set your CDASE profile (global, once)",
-  "fields": [
-    { "key": "Name", "label": "Name", "required": true },
-    { "key": "Role", "label": "Role", "options": ["architect","lead","developer","reviewer"] },
-    { "key": "Team", "label": "Team" },
-    { "key": "Organization", "label": "Organization" }
-  ],
-  "fallback_prompt": "Reply with your Name (required), Role, Team, Organization.",
-  "render_hint": "Render with your host's native input UI; else ask in text. Never open a browser.",
-  "apply_command": "python3 scripts/cdase_client.py apply-global-user --json '<values>'"
-}
-```
+Identity can live in two places. The agent MUST NOT guess.
 
-`kind` is `"choice"` (options) or `"form"` (fields). Fields with `options` are pick-lists;
-others are free-text. No `hub` call is needed to get a spec — it works offline.
+| Scope | File | When |
+|---|---|---|
+| **global** | `~/.cdase/user.context.md` | First boot (missing global), or user wants all projects |
+| **repo** | `<repo>/cdase/context/user.context.md` (gitignored) | Override for this project only |
 
-## Agent responsibilities
+### Agent rule
 
-1. Run `input-spec PRESET`.
-2. **Render natively**: in Cursor, present it as the multiple-choice / question card
-   (one question per field; use the option list for pick-lists; "Other" for free text).
-   On a host with no native input UI, ask the `fallback_prompt` in plain text.
-3. Collect the user's values.
-4. **Apply** the result yourself — CDASE input never writes files or changes state:
-   - `session.gate` → interpret choice: `yes` → CDASE ON, `no` → CDASE OFF.
-   - `user.profile` → `python3 scripts/cdase_client.py apply-global-user --json '<values>'`.
+1. **First boot**, global missing → `input-spec user-profile` → `apply-global-user` (scope implied: global). Do **not** create repo `user.context.md`.
+2. User later says “update my profile / add user info / change name” and does **not** say where → **`input-spec user-scope` first**:
+   - `global` → `user-profile` → `apply-global-user` (create **or** update)
+   - `repo` → `user-profile-repo` → `apply-repo-user` (create **or** update)
+3. User already says “globally” / “only in this repo” → skip scope; go straight to the matching form.
 
 ## Presets
 
 | Preset | kind | CLI | Result the agent applies |
 |---|---|---|---|
 | `session.gate` | choice | `input-spec session-gate` | `yes`/`no` → CDASE on/off |
+| `user.scope` | choice | `input-spec user-scope` | `global` / `repo` → next form |
 | `user.profile` | form | `input-spec user-profile` | `apply-global-user --json '{...}'` |
+| `user.profile.repo` | form | `input-spec user-profile-repo` | `apply-repo-user --json '{...}'` |
+| `hub.address` | form | `input-spec hub-address` | `apply-global-setting --json '{...}'` |
 
 ## Bootstrap flow (identity)
 
-1. Global `~/.cursor/cdase/user.context.md` missing → `input-spec user-profile`.
+1. Global `~/.cdase/user.context.md` missing → `input-spec user-profile`.
 2. Render natively (Cursor card) or ask in text.
-3. `apply-global-user --json '...'` writes the global profile.
+3. `apply-global-user --json '...'` writes `~/.cdase/user.context.md` (or `$CDASE_GLOBAL`).
 4. Continue charter boot (`check`, roster UUID lookup, lazy `login`).
 
 > The session gate itself is text-first by default (it must be instant and hub-independent);

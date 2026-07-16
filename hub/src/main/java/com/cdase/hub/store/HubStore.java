@@ -32,20 +32,46 @@ public final class HubStore {
 
     public Map<String, Object> login(String userUuid, String name, String machineId, Map<String, String> extra)
             throws SQLException {
+        return login(userUuid, name, machineId, null, extra);
+    }
+
+    public Map<String, Object> login(String userUuid, String name, String machineId, String repoId,
+                                     Map<String, String> extra) throws SQLException {
         upsertUser(userUuid, name, extra);
         touchMachine(userUuid, machineId);
+        if (repoId != null && !repoId.isBlank()) {
+            touchProjectSession(userUuid, repoId, machineId);
+        }
         return loadUser(userUuid);
     }
 
     public Map<String, Object> ping(String userUuid, String machineId) throws SQLException {
+        return ping(userUuid, machineId, null);
+    }
+
+    public Map<String, Object> ping(String userUuid, String machineId, String repoId) throws SQLException {
         if (loadUser(userUuid).isEmpty()) {
             return null;
         }
         touchMachine(userUuid, machineId);
+        if (repoId != null && !repoId.isBlank()) {
+            touchProjectSession(userUuid, repoId, machineId);
+        }
         return loadUser(userUuid);
     }
 
     public List<Map<String, Object>> listUsers() throws SQLException {
+        return listUsers(null);
+    }
+
+    public List<Map<String, Object>> listUsers(String repoId) throws SQLException {
+        if (repoId == null || repoId.isBlank()) {
+            return listUsersGlobal();
+        }
+        return listUsersForProject(repoId);
+    }
+
+    private List<Map<String, Object>> listUsersGlobal() throws SQLException {
         String sql = """
                 SELECT u.user_uuid, u.name, u.role, u.team, u.organization,
                        m.machine_id, m.last_seen
@@ -88,6 +114,64 @@ public final class HubStore {
                     if (seen > current) {
                         row.put("last_seen", seen);
                         row.put("active", now.getEpochSecond() - seenInstant.getEpochSecond() < ACTIVE_WINDOW_SECONDS);
+                    }
+                }
+            }
+        }
+
+        List<Map<String, Object>> users = new ArrayList<>(grouped.values());
+        users.sort(Comparator.comparingDouble(u -> -((Number) u.get("last_seen")).doubleValue()));
+        return users;
+    }
+
+    private List<Map<String, Object>> listUsersForProject(String repoId) throws SQLException {
+        String sql = """
+                SELECT u.user_uuid, u.name, u.role, u.team, u.organization,
+                       ps.machine_id, ps.last_seen
+                FROM project_sessions ps
+                JOIN users u ON u.user_uuid = ps.user_uuid
+                WHERE ps.repo_id = ?
+                ORDER BY u.name, ps.last_seen DESC
+                """;
+        Map<String, Map<String, Object>> grouped = new LinkedHashMap<>();
+        Instant now = Instant.now();
+
+        try (PreparedStatement ps = database.connection().prepareStatement(sql)) {
+            ps.setString(1, repoId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String userUuid = rs.getString("user_uuid");
+                    Map<String, Object> row = grouped.computeIfAbsent(userUuid, id -> {
+                        Map<String, Object> u = new LinkedHashMap<>();
+                        u.put("uuid", id);
+                        u.put("name", null);
+                        u.put("role", null);
+                        u.put("team", null);
+                        u.put("machines", new ArrayList<String>());
+                        u.put("last_seen", 0.0);
+                        u.put("active", false);
+                        u.put("repo_id", repoId);
+                        return u;
+                    });
+                    row.put("name", rs.getString("name"));
+                    row.put("role", rs.getString("role"));
+                    row.put("team", rs.getString("team"));
+                    String machineId = rs.getString("machine_id");
+                    if (machineId != null) {
+                        @SuppressWarnings("unchecked")
+                        List<String> machines = (List<String>) row.get("machines");
+                        if (!machines.contains(machineId)) {
+                            machines.add(machineId);
+                        }
+                        Timestamp lastSeen = rs.getTimestamp("last_seen");
+                        Instant seenInstant = lastSeen.toInstant();
+                        double seen = epochSeconds(seenInstant);
+                        double current = (double) row.get("last_seen");
+                        if (seen > current) {
+                            row.put("last_seen", seen);
+                            row.put("active", now.getEpochSecond() - seenInstant.getEpochSecond()
+                                    < ACTIVE_WINDOW_SECONDS);
+                        }
                     }
                 }
             }
@@ -155,6 +239,33 @@ public final class HubStore {
             }
         }
         return out;
+    }
+
+    /** All messages to recipient — client applies repo roster trust filter. */
+    public List<Map<String, Object>> getAllMessages(String toUuid, boolean includeRead) throws SQLException {
+        String readClause = includeRead ? "" : " AND read_at IS NULL";
+        String sql = "SELECT * FROM messages WHERE to_uuid = ?" + readClause + " ORDER BY sent_at";
+        List<Map<String, Object>> out = new ArrayList<>();
+        try (PreparedStatement ps = database.connection().prepareStatement(sql)) {
+            ps.setString(1, toUuid);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(readMessage(rs));
+                }
+            }
+        }
+        return out;
+    }
+
+    public int countAllUnread(String toUuid) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM messages WHERE to_uuid = ? AND read_at IS NULL";
+        try (PreparedStatement ps = database.connection().prepareStatement(sql)) {
+            ps.setString(1, toUuid);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
     }
 
     public int countUnread(String toUuid, List<String> trustUuids) throws SQLException {
@@ -276,6 +387,20 @@ public final class HubStore {
         try (PreparedStatement ps = database.connection().prepareStatement(merge)) {
             ps.setString(1, userUuid);
             ps.setString(2, machineId);
+            ps.executeUpdate();
+        }
+    }
+
+    private void touchProjectSession(String userUuid, String repoId, String machineId) throws SQLException {
+        String merge = """
+                MERGE INTO project_sessions (user_uuid, repo_id, machine_id, last_seen)
+                KEY(user_uuid, repo_id, machine_id)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """;
+        try (PreparedStatement ps = database.connection().prepareStatement(merge)) {
+            ps.setString(1, userUuid);
+            ps.setString(2, repoId);
+            ps.setString(3, machineId);
             ps.executeUpdate();
         }
     }

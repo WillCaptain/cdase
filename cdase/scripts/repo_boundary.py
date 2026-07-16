@@ -7,7 +7,8 @@ from pathlib import Path
 
 # Paths always blocked even if readable (outside repo tree)
 FORBIDDEN_PREFIXES = (
-    Path.home() / ".cursor" / "cdase",
+    Path.home() / ".cdase",
+    Path.home() / ".cursor" / "cdase",  # legacy global dir
     Path.home() / ".ssh",
     Path.home() / ".aws",
 )
@@ -80,7 +81,7 @@ def classify_message_body(body: str, git_root: Path | None) -> str | None:
         return None
     home = str(Path.home())
     if home in body and str(git_root) not in body:
-        for marker in ("/.cursor/cdase", "/.ssh/", "/.env", "API_KEY", "SECRET"):
+        for marker in ("/.cdase", "/.cursor/cdase", "/.ssh/", "/.env", "API_KEY", "SECRET"):
             if marker in body:
                 return (
                     f"message may contain out-of-repo sensitive paths or secrets ({marker}); "

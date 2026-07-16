@@ -49,10 +49,11 @@ engineering action (§3+), not during boot.
 ### Runtime lives INSIDE the project repo (committed)
 
 The CDASE runtime folder is the **team's shared source of truth** and MUST live
-inside the project git repository so it is committed and pushed:
+inside the **application** git repository — never in the CDASE **framework** repo
+(the checkout that contains `cdase/SKILL.md`).
 
 ```
-<project-repo>/
+<application-repo>/
 └── cdase/                         ← create here, at the repo root, and COMMIT
     ├── context/
     │   ├── users.context.md       roster + UUID SSOT — COMMITTED
@@ -62,28 +63,73 @@ inside the project git repository so it is committed and pushed:
     ├── requirements/  api/  design/  run_log/   ← all COMMITTED
 ```
 
+**Not** the framework repo's `cdase/` (that folder is the skill package: `SKILL.md`,
+`resources/`, `scripts/`).
+
+#### Resolve the correct repo first
+
+Before bootstrap or `check`, run:
+
+```
+python3 scripts/cdase_client.py discover
+```
+
+Follow [protocol/repo-resolution.md](protocol/repo-resolution.md):
+
+1. **Workspace is one git repo** → if framework repo, stop and open the app repo;
+   if app repo, use/create `<repo>/cdase/` at that repo root.
+2. **Workspace is a parent of multiple repos** → scan children; never use workspace
+   root as runtime. For **2b** (none have cdase): ask **all repos with same user, or
+   none** — init every app repo or none. For **2c** (mixed): confirm identity, then
+   same all-or-none for repos still missing cdase. Never bootstrap the framework repo.
+3. **Active work** uses one `CDASE_ROOT=<app-repo>/cdase` at a time; bootstrap can
+   touch multiple repos when user chooses **all**.
+
 Rules the AI MUST follow:
 
-* **If `<repo>/cdase/` does not exist, CDASE is uninitialized.** Do not start any
-  requested task first — confirm the CDASE opt-in ([session-gate.md](session-gate.md)),
-  and on **yes** create + commit `cdase/` before proceeding, so the work is CDASE-based.
-* When creating the runtime, place `cdase/` at the **project repo root** (same repo
-  as the code), never outside it. Verify with `git rev-parse --show-toplevel`.
-* Add `cdase/context/user.context.md` to the repo `.gitignore` (personal identity only).
-* **Commit** `cdase/` (roster + artifacts) so teammates share the same base. Without
-  a committed `cdase/`, there is no team SSOT.
-* Personal, per-machine files live in `~/.cursor/cdase/` (global identity + hub
-  address) and are **never** committed — this is separate from the repo runtime.
+* **If no consumer `<repo>/cdase/context/` exists**, confirm CDASE opt-in first
+  ([session-gate.md](session-gate.md)), then `discover`. Multiple app repos → **all
+  or none** (same user in each), never pick-one, never framework repo.
+* **Never** create team runtime under the framework repo or under workspace root when
+  child repos exist.
+* Verify target with `discover` and `git rev-parse --show-toplevel` in the **app** repo.
+* Add `cdase/context/user.context.md` to the app repo `.gitignore`.
+* **Commit** `cdase/` in the **app** repo so teammates share the same SSOT.
+* Personal files stay in `~/.cdase/` — never committed.
 
 ### Hub is lazy — connect only when needed
 
-Hub `login` / `inbox` are **not** boot steps. Perform them only when:
+Hub `inbox` / `send` / `team` are **not** boot steps. Connect when:
 
+* the user asks about **team / who else is on the project** → run `team` (auto-refreshes your presence on the hub),
 * the user asks about messages / collaboration, or
 * the first engineering task begins (task discovery, §4).
 
-If the hub is unreachable and `Hub.OfflineOk` is true, continue in offline mode
-silently; if false, report when a hub action is actually attempted.
+Every hub-touching client command (`check`, `team`, `send`, `inbox`, …) **auto-refreshes
+presence** (ping if already registered, else login). No separate `login` step is required
+for teammates to see you online.
+
+### Who is on the team? (never git history)
+
+When the user asks who else is working on the project, who is online, or team members:
+
+1. **Do NOT** use `git log`, `git shortlog`, or commit authors — those are not CDASE users.
+2. Run:
+   ```
+   python3 scripts/cdase_client.py team
+   ```
+3. Present results in order:
+   * **Roster** (`users.context.md`) — committed teammates; **online** / **offline** from hub.
+   * **Hub only** — logged in but not in committed roster yet (unpushed).
+   * **Git contributors (last row)** — `git_contributors` from `team` output; supplementary only, not CDASE users.
+4. Explain: roster sync requires **push** of `users.context.md`; hub shows online before push.
+
+See [protocol/agent-messaging.md](protocol/agent-messaging.md) § Team discovery.
+
+If the hub is unreachable, the agent **must show** `hub_warning.message` from `check` or
+`team` to the user (CDASE mode) — never fail silently. If `Hub.OfflineOk` is true,
+continue local work after the warning; if false, treat hub actions as blocked until the
+hub is running.
 
 Trust for all hub calls comes from `/cdase/context/users.context.md`, never the hub.
 Inter-agent procedure: [protocol/agent-messaging.md](protocol/agent-messaging.md).
