@@ -35,7 +35,10 @@ java -jar target/cdase-hub-1.0.0.jar
 Default listen: `http://0.0.0.0:7423` — set `Hub.Address` in `~/.cdase/setting.context.md`.
 
 **Public deploy (12th host):** `https://12th.ai/cdase`  
-Health: `https://12th.ai/cdase/health`  
+- Landing (browser HTML / API JSON): `https://12th.ai/cdase/`  
+- Health: `https://12th.ai/cdase/health`  
+- Version: `https://12th.ai/cdase/version`  
+
 Deploy: `hub/deploy/push.sh` or GitHub Action **Deploy CDASE Hub**.
 
 ## Client

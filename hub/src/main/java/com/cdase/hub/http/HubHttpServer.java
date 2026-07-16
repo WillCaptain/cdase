@@ -53,12 +53,31 @@ public final class HubHttpServer {
             String path = exchange.getRequestURI().getPath();
             Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
 
+            if ("GET".equals(method) && ("/".equals(path) || path.isEmpty())) {
+                respondRoot(exchange);
+                return;
+            }
             if ("GET".equals(method) && "/health".equals(path)) {
                 respond(exchange, 200, Map.of("ok", true, "service", "cdase-hub", "time", epochNow()));
                 return;
             }
+            if ("GET".equals(method) && "/version".equals(path)) {
+                respond(exchange, 200, Map.of(
+                        "ok", true,
+                        "service", "cdase-hub",
+                        "version", hubVersion(),
+                        "time", epochNow()
+                ));
+                return;
+            }
             if ("GET".equals(method) && "/users".equals(path)) {
-                respond(exchange, 200, Map.of("users", store.listUsers()));
+                String repoId = query.get("repo_id");
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("users", store.listUsers(repoId));
+                if (repoId != null && !repoId.isBlank()) {
+                    payload.put("repo_id", repoId);
+                }
+                respond(exchange, 200, payload);
                 return;
             }
             if ("GET".equals(method) && "/messages".equals(path)) {
@@ -68,12 +87,18 @@ public final class HubHttpServer {
                     return;
                 }
                 List<String> trust = parseTrust(query.get("trust"));
-                if (trust.isEmpty()) {
-                    respond(exchange, 400, Map.of("error", "query param 'trust' is required (comma-separated UUIDs from repo roster)"));
+                boolean includeRead = "1".equals(query.get("all")) || "true".equalsIgnoreCase(query.get("all"));
+                boolean allSenders = "all".equalsIgnoreCase(query.get("trust"))
+                        || "*".equals(query.get("trust"));
+                List<Map<String, Object>> messages = allSenders
+                        ? store.getAllMessages(userUuid, includeRead)
+                        : store.getMessages(userUuid, trust, includeRead);
+                if (!allSenders && trust.isEmpty()) {
+                    respond(exchange, 400, Map.of(
+                            "error", "query param 'trust' is required (roster UUIDs, or 'all' for every sender)"));
                     return;
                 }
-                boolean includeRead = "1".equals(query.get("all")) || "true".equalsIgnoreCase(query.get("all"));
-                respond(exchange, 200, Map.of("messages", store.getMessages(userUuid, trust, includeRead)));
+                respond(exchange, 200, Map.of("messages", messages));
                 return;
             }
             if ("GET".equals(method) && "/kb".equals(path)) {
@@ -106,26 +131,37 @@ public final class HubHttpServer {
                     putIfPresent(body, extra, "team");
                     putIfPresent(body, extra, "organization");
                     String userUuid = str(body.get("uuid"));
-                    store.login(userUuid, str(body.get("name")), str(body.get("machine_id")), extra);
+                    String repoId = str(body.get("repo_id"));
+                    store.login(userUuid, str(body.get("name")), str(body.get("machine_id")), repoId, extra);
                     List<String> trust = parseTrust(str(body.get("trust")));
-                    respond(exchange, 200, Map.of(
-                            "ok", true,
-                            "uuid", userUuid,
-                            "user", str(body.get("name")),
-                            "unread", store.countUnread(userUuid, trust)
-                    ));
+                    Map<String, Object> ok = new LinkedHashMap<>();
+                    ok.put("ok", true);
+                    ok.put("uuid", userUuid);
+                    ok.put("user", str(body.get("name")));
+                    ok.put("unread", store.countUnread(userUuid, trust));
+                    if (repoId != null && !repoId.isBlank()) {
+                        ok.put("repo_id", repoId);
+                    }
+                    respond(exchange, 200, ok);
                 }
                 case "/ping" -> {
                     if (!require(exchange, body, "uuid", "machine_id")) {
                         return;
                     }
                     String userUuid = str(body.get("uuid"));
-                    if (store.ping(userUuid, str(body.get("machine_id"))) == null) {
+                    String repoId = str(body.get("repo_id"));
+                    if (store.ping(userUuid, str(body.get("machine_id")), repoId) == null) {
                         respond(exchange, 404, Map.of("error", "unknown user, login first"));
                         return;
                     }
                     List<String> trust = parseTrust(str(body.get("trust")));
-                    respond(exchange, 200, Map.of("ok", true, "unread", store.countUnread(userUuid, trust)));
+                    Map<String, Object> ok = new LinkedHashMap<>();
+                    ok.put("ok", true);
+                    ok.put("unread", store.countUnread(userUuid, trust));
+                    if (repoId != null && !repoId.isBlank()) {
+                        ok.put("repo_id", repoId);
+                    }
+                    respond(exchange, 200, ok);
                 }
                 case "/messages" -> {
                     if (!require(exchange, body, "from_uuid", "to_uuid", "body")) {
@@ -212,6 +248,75 @@ public final class HubHttpServer {
 
         private void respond(HttpExchange exchange, int code, Map<String, ?> payload) throws IOException {
             JsonResponder.respond(exchange, code, payload);
+        }
+
+        /** Public landing for https://12th.ai/cdase/ — proves the hub is online. */
+        private void respondRoot(HttpExchange exchange) throws IOException {
+            String accept = exchange.getRequestHeaders().getFirst("Accept");
+            boolean wantHtml = accept != null && accept.toLowerCase().contains("text/html");
+            if (wantHtml) {
+                String html = """
+                        <!doctype html>
+                        <html lang="en">
+                        <head>
+                          <meta charset="utf-8"/>
+                          <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                          <title>CDASE Hub</title>
+                          <style>
+                            :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+                            body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+                                   background: #0f1419; color: #e7ecf3; }
+                            main { max-width: 36rem; padding: 2rem; }
+                            h1 { font-size: 1.75rem; margin: 0 0 .5rem; letter-spacing: -.02em; }
+                            .ok { color: #3dd68c; font-weight: 600; }
+                            p { line-height: 1.5; color: #a8b3c2; }
+                            code { color: #9ecbff; }
+                            ul { padding-left: 1.2rem; color: #c5ced9; }
+                            a { color: #7eb6ff; }
+                          </style>
+                        </head>
+                        <body>
+                          <main>
+                            <h1>CDASE Hub</h1>
+                            <p class="ok">Online</p>
+                            <p>Collaboration API for Context-Driven AI Software Engineering.</p>
+                            <ul>
+                              <li><a href="health"><code>GET /health</code></a></li>
+                              <li><a href="version"><code>GET /version</code></a></li>
+                              <li><code>GET /users</code>, <code>GET /messages</code>, <code>POST /login</code></li>
+                            </ul>
+                            <p>Public base: <code>https://12th.ai/cdase</code></p>
+                          </main>
+                        </body>
+                        </html>
+                        """;
+                JsonResponder.respondRaw(exchange, 200, html.getBytes(StandardCharsets.UTF_8),
+                        "text/html; charset=utf-8");
+                return;
+            }
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("ok", true);
+            payload.put("service", "cdase-hub");
+            payload.put("status", "online");
+            payload.put("version", hubVersion());
+            payload.put("time", epochNow());
+            payload.put("public_base", "https://12th.ai/cdase");
+            payload.put("endpoints", Map.of(
+                    "health", "GET /health",
+                    "version", "GET /version",
+                    "users", "GET /users?repo_id=",
+                    "messages", "GET /messages?uuid=&trust=",
+                    "login", "POST /login",
+                    "ping", "POST /ping",
+                    "send", "POST /messages",
+                    "ack", "POST /messages/ack",
+                    "kb", "GET|POST /kb"
+            ));
+            respond(exchange, 200, payload);
+        }
+
+        private String hubVersion() {
+            return "1.0.0";
         }
 
         private Map<String, String> parseQuery(String raw) {
