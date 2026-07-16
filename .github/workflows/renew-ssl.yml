@@ -50,33 +50,86 @@ jobs:
           "${SSH[@]}" "${USER}@${HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           echo "=== before ==="
-          certbot certificates 2>&1 || true
           date -u
+          echo "--- nginx ssl_certificate lines ---"
+          grep -R "ssl_certificate" /etc/nginx/ 2>/dev/null | head -40 || true
+          echo "--- /etc/letsencrypt ---"
+          ls -la /etc/letsencrypt/live 2>/dev/null || true
+          ls -la /etc/nginx/ssl 2>/dev/null || true
+          echo | openssl s_client -connect 127.0.0.1:443 -servername 12th.ai 2>/dev/null \
+            | openssl x509 -noout -dates -subject || true
 
-          if ! command -v certbot >/dev/null 2>&1; then
-            if command -v dnf >/dev/null 2>&1; then
-              dnf install -y certbot python3-certbot-nginx
-            elif command -v yum >/dev/null 2>&1; then
-              yum install -y certbot python3-certbot-nginx
-            else
-              apt-get update -qq && apt-get install -y -qq certbot python3-certbot-nginx
+          install_certbot() {
+            if command -v certbot >/dev/null 2>&1; then return 0; fi
+            # Alibaba Cloud Linux often lacks certbot RPMs — prefer snap, then pip
+            if command -v snap >/dev/null 2>&1; then
+              snap install --classic certbot || true
+              ln -sf /snap/bin/certbot /usr/bin/certbot || true
             fi
-          fi
+            if ! command -v certbot >/dev/null 2>&1; then
+              if command -v dnf >/dev/null 2>&1; then
+                dnf install -y epel-release || true
+                dnf install -y certbot python3-certbot-nginx || true
+              fi
+            fi
+            if ! command -v certbot >/dev/null 2>&1; then
+              export PATH="/usr/local/bin:/root/.local/bin:$PATH"
+              python3 -m pip install -U pip || true
+              python3 -m pip install -U certbot certbot-nginx || true
+              hash -r || true
+            fi
+            command -v certbot >/dev/null 2>&1
+          }
 
-          # Prefer renew; if no live cert, issue for 12th.ai
-          if certbot certificates 2>/dev/null | grep -q 'Certificate Name'; then
-            certbot renew --nginx --non-interactive --agree-tos --force-renewal
+          renew_with_acme() {
+            echo "=== falling back to acme.sh ==="
+            export HOME=/root
+            if [[ ! -f /root/.acme.sh/acme.sh ]]; then
+              curl -sS https://get.acme.sh | sh -s email=admin@12th.ai
+            fi
+            # shellcheck disable=SC1091
+            source /root/.acme.sh/acme.sh.env 2>/dev/null || true
+            /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+            /root/.acme.sh/acme.sh --issue -d 12th.ai -w /var/www/html --force \
+              || /root/.acme.sh/acme.sh --issue -d 12th.ai --nginx --force \
+              || /root/.acme.sh/acme.sh --issue -d 12th.ai --standalone --force \
+                 --pre-hook "nginx -s stop || true" --post-hook "nginx || systemctl start nginx"
+            CERT_DIR="/root/.acme.sh/12th.ai_ecc"
+            [[ -d "$CERT_DIR" ]] || CERT_DIR="/root/.acme.sh/12th.ai"
+            mkdir -p /etc/nginx/ssl/12th.ai
+            /root/.acme.sh/acme.sh --install-cert -d 12th.ai \
+              --key-file /etc/nginx/ssl/12th.ai/privkey.pem \
+              --fullchain-file /etc/nginx/ssl/12th.ai/fullchain.pem \
+              --reloadcmd "nginx -t && nginx -s reload"
+            # Point nginx at new files if still on expired paths
+            for conf in /etc/nginx/conf.d/*.conf /etc/nginx/nginx.conf; do
+              [[ -f "$conf" ]] || continue
+              if grep -q 'ssl_certificate' "$conf"; then
+                sed -i 's|ssl_certificate[[:space:]].*;|ssl_certificate /etc/nginx/ssl/12th.ai/fullchain.pem;|g' "$conf"
+                sed -i 's|ssl_certificate_key[[:space:]].*;|ssl_certificate_key /etc/nginx/ssl/12th.ai/privkey.pem;|g' "$conf"
+              fi
+            done
+            nginx -t && nginx -s reload
+          }
+
+          if install_certbot; then
+            echo "certbot: $(command -v certbot)"
+            if [[ -d /etc/letsencrypt/live ]]; then
+              certbot renew --nginx --non-interactive --agree-tos --force-renewal \
+                || certbot renew --webroot -w /var/www/html --non-interactive --force-renewal \
+                || renew_with_acme
+            else
+              certbot --nginx -d 12th.ai --non-interactive --agree-tos \
+                --register-unsafely-without-email --redirect \
+                || renew_with_acme
+            fi
+            nginx -t && nginx -s reload
+            certbot certificates 2>&1 || true
           else
-            certbot --nginx -d 12th.ai -d www.12th.ai --non-interactive --agree-tos \
-              --register-unsafely-without-email --redirect || \
-            certbot --nginx -d 12th.ai --non-interactive --agree-tos \
-              --register-unsafely-without-email --redirect
+            renew_with_acme
           fi
 
-          nginx -t
-          nginx -s reload
           echo "=== after ==="
-          certbot certificates 2>&1 || true
           echo | openssl s_client -connect 127.0.0.1:443 -servername 12th.ai 2>/dev/null \
             | openssl x509 -noout -dates -subject || true
           REMOTE
