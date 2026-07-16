@@ -17,8 +17,8 @@ Consumer runtime lives in the **application project** at `my-app/cdase/`.
 
 | Path | Role |
 |---|---|
-| `~/.cursor/cdase/user.context.md` | Global identity (Name) |
-| `~/.cursor/cdase/setting.context.md` | Default hub address |
+| `~/.cdase/user.context.md` | Global identity (Name; all agents) |
+| `~/.cdase/setting.context.md` | Default hub address |
 | `/cdase/context/users.context.md` | Trusted roster + UUID SSOT |
 | `/cdase/context/setting.context.md` | Optional repo hub override |
 
@@ -32,7 +32,11 @@ mvn -q package
 java -jar target/cdase-hub-1.0.0.jar
 ```
 
-Default listen: `http://0.0.0.0:7423` — set `Hub.Address` in each project's `setting.context.md`.
+Default listen: `http://0.0.0.0:7423` — set `Hub.Address` in `~/.cdase/setting.context.md`.
+
+**Public deploy (12th host):** `https://12th.ai/cdase`  
+Health: `https://12th.ai/cdase/health`  
+Deploy: `hub/deploy/push.sh` or GitHub Action **Deploy CDASE Hub**.
 
 ## Client
 

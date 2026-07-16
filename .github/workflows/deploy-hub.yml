@@ -90,7 +90,11 @@ jobs:
         run: |
           set -euo pipefail
           sleep 2
-          code=$(curl -sS -o /tmp/h.json -w '%{http_code}' "http://${SSH_HOST}/cdase/health" || true)
+          # Site forces HTTPS (cert may be expired — use -k). Follow redirects.
+          code=$(curl -sS -k -L -o /tmp/h.json -w '%{http_code}' "https://12th.ai/cdase/health" \
+            || curl -sS -k -L -o /tmp/h.json -w '%{http_code}' "https://${SSH_HOST}/cdase/health" \
+            || true)
           echo "HTTP $code"
           cat /tmp/h.json || true
           test "$code" = "200"
+          grep -q '"ok":true' /tmp/h.json
