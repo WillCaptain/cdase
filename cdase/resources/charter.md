@@ -33,7 +33,7 @@ Interpret the result:
 
 * `ok: true` → identity resolved; continue. Nothing else is required at boot.
 * `ok: false`, global user missing → `input-spec user-profile`, render it with the host's
-  native input UI (else plain text), then `apply-global-user --json '<values>'`
+  host input UI first (else plain text), then `apply-global-user --json '<values>'`
   ([protocol/input.md](protocol/input.md)); re-run `check`.
 * `ok: false`, name not in roster / UUID mismatch → report and ask to fix
   `/cdase/context/users.context.md` (roster is SSOT for UUID).

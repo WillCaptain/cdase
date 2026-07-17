@@ -122,7 +122,7 @@ See [protocol/agent-messaging.md](protocol/agent-messaging.md).
 ## User input (host-native, text fallback)
 
 CDASE emits a declarative input spec; the **agent** renders it with the host's native
-input UI (Cursor: multiple-choice / question card) or plain text. No CDASE UI, no browser.
+input UI (host-specific) or plain text. Same generic order on every agent. No CDASE UI, no browser.
 
 ```bash
 python3 scripts/cdase_client.py input-spec session-gate

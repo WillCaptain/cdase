@@ -1,7 +1,7 @@
 {
   "name": "cdase",
-  "version": "1.7.1",
-  "description": "CDASE: machine-as-user; ask only for code work; hub template https://12th.ai/cdase.",
+  "version": "1.7.3",
+  "description": "CDASE: generic host-UI-then-text input order; machine-as-user; hub 12th.ai/cdase.",
   "author": {
     "name": "12th.ai"
   },

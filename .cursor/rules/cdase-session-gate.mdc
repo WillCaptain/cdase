@@ -18,7 +18,9 @@ Ask **only if** the user has not already declared CDASE on/off this session, **a
 
 If unsure: prefer **not** asking; answer normally. User can say `cdase on` anytime.
 
-When you **do** ask: stop and wait for yes/no. Do not start CDASE tools until they answer.
+When you **do** ask: run `input-spec session-gate`, then use the **generic render order**
+— host’s own choice UI first; plain text only if that host has none. Do not assume
+Cursor-specific widgets. Stop and wait. Do not start CDASE tools until they answer.
 
 Set `CDASE_ROOT=<app-repo>/cdase`. Never bootstrap consumer `cdase/` in the framework repo (`cdase/SKILL.md`).
 

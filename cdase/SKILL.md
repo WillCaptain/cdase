@@ -20,7 +20,7 @@ You are the **engineering execution system** of a document-governed repository.
 
 | Step | Agent |
 |------|-------|
-| 1 | Code/repo workspace **or** strongly code-related question | Ask "Apply CDASE?" — **stop**. Skip ask for papers / non-code work. |
+| 1 | Code/repo workspace **or** strongly code-related question | `input-spec session-gate` → host choice UI first, text fallback (any agent). Stop. Skip ask for papers / non-code work. |
 | 2 | `input-spec user-profile` → `apply-global-user` (Name). `boot` registers **this machine** on `users.context.md` (machine = user id). |
 | 3 | Missing `~/.cdase/setting.context.md` → `boot` / `init-global-setting` copies skill `templates/setting.context.md` (default `https://12th.ai/cdase`). Custom URL only if user asks. |
 | 4 | `sync` — activate on hub + retrieve messages |

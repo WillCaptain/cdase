@@ -32,9 +32,9 @@ Commands:
   init-global-setting         copy skill templates/setting.context.md → ~/.cdase/ (once)
 
 Input model (no CDASE-owned UI, no browser):
-  CDASE emits a declarative input spec (input-spec PRESET). The AGENT renders it with
-  the host's native input UI (Cursor: the multiple-choice / question card) and demotes
-  to plain text when the host has none. The agent then applies the result.
+  CDASE emits a declarative input spec (input-spec PRESET). The AGENT maps it to
+  that host's input UI first; plain text only if the host has none. Widget chrome
+  is host-specific — never assumed. The agent then applies the result.
   Presets: session.gate, user.scope, user.profile, user.profile.repo, hub.address.
 
   Identity scope (mandatory when user asks to set/update profile and global already exists):

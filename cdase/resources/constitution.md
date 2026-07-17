@@ -368,7 +368,7 @@ The AI MUST NOT exfiltrate out-of-repo data in Hub messages without explicit use
 
 CDASE never ships its own UI and never opens a browser. When input is needed it emits a
 **declarative input spec** (`input-spec PRESET`); the **agent** renders it with the host's
-native input UI (in Cursor, the multiple-choice / question card) and demotes to plain text
+host input UI (whatever that agent provides) and demotes to plain text
 when the host has none. The agent performs all writes/actions on the collected `values`.
 See [protocol/input.md](protocol/input.md).
 

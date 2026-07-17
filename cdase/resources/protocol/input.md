@@ -1,28 +1,36 @@
-# CDASE Input Protocol (host-native, text-fallback)
+# CDASE Input Protocol (host-native first, text fallback)
 
 > CDASE **never ships its own UI** and never opens a browser. When it needs input, it
-> emits a **declarative input spec**; the **agent** renders it with the host's richest
-> native input UI and demotes to plain text when the host has none. The agent owns the
-> post-submit action.
+> emits a **declarative input spec**. The **agent** maps that spec onto **whatever input
+> UI its host provides**. Order is always the same; the concrete widget differs by agent.
 
-## Why (the hard constraint)
+## Generic render order (mandatory for every host)
 
-There is **no cross-agent way to render custom HTML inside a chat**:
+1. Run `input-spec PRESET` → get `kind`, `options` / `fields`, `fallback_prompt`, `render_hint`.
+2. **Use the host’s richest matching input UI** for that `kind` (choice → options UI; form → fields UI).
+3. If that UI is missing or fails → **plain text** using `fallback_prompt`.
+4. Never open a browser; never invent a CDASE-owned HTML page.
 
-- **Cursor** chat renders only markdown + Cursor's own components — no third-party HTML injection.
-- **CLI agents** (e.g. Claude Code) are terminal-only — no HTML at all.
+CDASE does **not** prescribe Cursor cards, Claude prompts, Codex forms, etc. Each agent
+implements step 2 with its own primitives.
 
-So the portable design is **instruction-level, not API-level**: describe the input,
-let each host draw it with what it has.
+## Why (portable by design)
 
-## Rendering tiers (agent picks the best available)
+There is no one cross-agent widget API. So CDASE stays **instruction-level**:
 
-| Tier | Host example | How the spec is shown |
+- Spec = what to ask (`choice` / `form` + fields).
+- Host = how to show it (that product’s buttons, pickers, slash UI, TUI, …).
+- Text = universal floor when the host has no structured input.
+
+## Kind → intent (host maps to its own UI)
+
+| Spec `kind` | Intent | Host maps to (examples — not exhaustive) |
 |---|---|---|
-| Native structured UI | Cursor multiple-choice / question card | inline, clickable options; free-text via "Other" |
-| Plain text | any CLI / minimal host | the `fallback_prompt` string |
+| `choice` | Pick one option | yes/no buttons, multiple-choice, select list, numbered menu |
+| `form` | Collect fields | multi-step questions, native form, pick-list for `options` fields |
 
-Text is the universal floor — functionality is never lost, only the richer card is.
+Illustrative only: Cursor may use question cards; a CLI may use a TUI select; another IDE
+may use its own picker. **Same order, different chrome.**
 
 ## Get an input spec
 
@@ -64,9 +72,9 @@ Identity can live in two places. The agent MUST NOT guess.
 ## Bootstrap flow (identity)
 
 1. Global `~/.cdase/user.context.md` missing → `input-spec user-profile`.
-2. Render natively (Cursor card) or ask in text.
+2. Render with **host UI first** (generic order above); text only if unavailable.
 3. `apply-global-user --json '...'` writes `~/.cdase/user.context.md` (or `$CDASE_GLOBAL`).
-4. Continue charter boot (`check`, roster UUID lookup, lazy `login`).
+4. Continue charter boot (`boot` / `check`, machine roster, lazy `login`).
 
-> The session gate itself is text-first by default (it must be instant and hub-independent);
-> a host MAY render it as a native yes/no card, but plain text is always sufficient.
+> Session gate (`input-spec session-gate`) uses the same generic order: host choice UI
+> if any; else plain “yes / no”.

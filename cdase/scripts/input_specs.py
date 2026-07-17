@@ -1,9 +1,9 @@
 """Host-agnostic input specs for CDASE.
 
-CDASE never ships its own UI. It emits a *declarative* input request; the agent
-renders it with the host's richest native input UI (e.g. Cursor's multiple-choice /
-question card) and falls back to plain text when the host has none. The agent owns
-the post-submit action (e.g. `apply-global-user`).
+CDASE never ships its own UI. It emits a *declarative* input request. Every code
+agent maps that spec onto its host's input UI (order: host UI → plain text).
+Product-specific widgets are never prescribed. The agent owns the post-submit
+action (e.g. `apply-global-user`).
 """
 
 from __future__ import annotations
@@ -14,10 +14,9 @@ from pathlib import Path
 from context_loader import global_cdase_dir
 
 _RENDER_HINT = (
-    "Render this using your host's richest native input UI "
-    "(in Cursor: the multiple-choice / question card). "
-    "If the host has no native input UI, ask in plain text using fallback_prompt. "
-    "Never open a browser or external page."
+    "Generic order (all hosts): (1) map this spec to your host's richest matching "
+    "input UI for kind=choice|form; (2) only if unavailable, ask with fallback_prompt. "
+    "Do not assume a specific product's widgets. Never open a browser or external page."
 )
 
 SESSION_GATE = {

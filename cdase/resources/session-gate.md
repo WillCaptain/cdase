@@ -21,8 +21,9 @@ with no code context). Be a normal assistant. User may say `cdase on` anytime.
 
 If unsure whether it is code work: **do not ask**; answer normally.
 
-When you ask: **stop and wait**. Do not run CDASE tools until they reply.
-Plain text is enough; optional host native yes/no card. See [protocol/input.md](protocol/input.md).
+When you ask: run `input-spec session-gate`, then follow the **generic render order**
+([protocol/input.md](protocol/input.md)): host choice UI first, plain “yes / no” only if
+the host has none. **Stop and wait**. Do not run CDASE tools until they reply.
 
 ## No consumer `cdase/` in the target repo → confirmation is MANDATORY (code work only)
 
