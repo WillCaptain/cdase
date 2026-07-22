@@ -75,10 +75,11 @@ jobs:
           fi
 
           "${SSH[@]}" "${USER}@${HOST}" "mkdir -p $DIR/data $DIR/logs"
-          "${SCP[@]}" hub/target/cdase-hub-1.0.0.jar "${USER}@${HOST}:${DIR}/cdase-hub.jar"
+          "${SCP[@]}" hub/target/cdase-hub-1.1.0.jar "${USER}@${HOST}:${DIR}/cdase-hub.jar"
           "${SCP[@]}" \
             hub/deploy/start.sh \
             hub/deploy/stop.sh \
+            hub/deploy/hub.env.example \
             hub/deploy/nginx-cdase.conf \
             hub/deploy/remote-install-nginx.sh \
             "${USER}@${HOST}:${DIR}/"

@@ -1,103 +1,81 @@
-> **Optional sections are omitted by default.**
-> Include an Optional section only when it adds necessary, concrete information.
-> Empty optional sections MUST NOT be written.
-> all information should be short, concise, accurate
+# Function: FUN-XXX-YY-ZZ — <Function Title>
 
-# Function: FUN-XXX-YY-ZZ <Function Title>
+> Canonical path:
+> `/cdase/requirements/SCN-XXX/FTR-YY/FUN-ZZ/function.md`
+> This file is the stable Function contract. Execution state belongs only in
+> `progress.md`; gates belong only in `gates.md`. `design.md` is required only
+> when the parent Feature design does not fully specify this Function.
 
 ## 0. Metadata
 - ID: FUN-XXX-YY-ZZ
-- FTR ID: FTR-XXX-YY
-- Owner: <name/team>
+- Feature: FTR-XXX-YY (`../feature.md`)
+- Steward: <8-hex-user-id> (<project-alias>)
 - Group/Module: <group>/<module>
-- Stage: <Requirement|Design|Development|Test|Acceptance>
-- Status: <NotStarted|InProgress|Done|Blocked>
-- Stability: <Experimental | Stable | Frozen>
 - Priority: <P0|P1|P2>
 - Version: v0.1
+- Stability: <Experimental | Stable | Frozen | Deprecated>
 - Last Updated: <YYYY-MM-DD>
-- Depends On: 
-  - Only APIs defined outside the current Function scope.
-  - Each dependency **MUST** be an explicit invokeable API address listed in `/api/modules`.
-  - Belong Function/Feature Id followed the API address.
-  - **VERY IMPORTANT: Self-dependencies (direct or indirect) are strictly forbidden.**
 
-## 1. Summary (One Paragraph)
+## 1. Summary
+<One paragraph: single responsibility and caller value.>
 
+## 2. Contract
 
-## 2. API / Method
-> MUST not duplicate existing apis in `\api\`
-- `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
-  - description
-  - Params: ...
-  - Returns: ...
-  - Throws: ...
+### API / Method
+- Global API Pool ID: `<organization/system/module/operation>`
+- Version / Status: `<version>` / `<DEVELOPING | RELEASED | SUPERSEDED | DEPRECATED | RETIRED>`
+- Signature: `<module>.<class>.<method>(<params>) -> <return>` or REST/CLI/SDK
+- Purpose: ...
+- Inputs:
+  - `<name>: <type>` — <constraints>
+- Output: `<type>` — <meaning>
+- Errors:
+  - `<error>` — <condition>
 
-## 3. Acceptance Criteria (Testable Contract)
-> MUST be testable. Each AC has stable ID: AC-01, AC-02...
+### SPI / Dependencies
+> Every external dependency MUST be found in the Global API Pool and verified
+> against its owning repository contract. Direct and indirect self-dependencies
+> are forbidden.
 
-- AC-01: <Given/When/Then style>
+- `<address/signature>` — owner: <FTR/FUN ID>; purpose: ...
+
+## 3. Acceptance Criteria
+> These criteria are the Function behavioral contract and remain in `function.md`.
+> Each stable AC ID MUST map to at least one executable contract test.
+
+- AC-01: Given ... When ... Then ...
 - AC-02: ...
-- AC-03: ...
 
-## 4. Error Handling & Edge Cases (Optional)
-- E-01: <condition> -> <error/behavior>
+## 4. Error Handling and Edge Cases
+- E-01: <condition> → <error/behavior>
 - E-02: ...
 
+## 5. Constraints and Invariants
+- C-01: ...
+- INV-01: <must never happen>; enforced by: <test/assertion>
 
-## 5. Contract Tests Index (MUST be synced with /tests)
-> Tests are derived from Acceptance Criteria. Test names MUST be stable:
-> `test_FUN_XXX_YY_ZZ_AC_01_<slug>`
+## 6. Contract Test Index
 
-### Test File
-- Path: `/tests/contract/test_FUN_XXX_YY_ZZ.py` (or language equivalent)
+| AC ID | Test Name | Test Path |
+|---|---|---|
+| AC-01 | `test_FUN_XXX_YY_ZZ_AC_01_<slug>` | `<repo-relative path>` |
 
-### Test Cases
-| AC ID | Test Name | Description | Input Set | Expected Output |
-|------|-----------|-------------|-----------|-----------------|
-| AC-01 | test_FUN_XXX_YY_ZZ_AC_01_<slug> | ... | ... | ... |
-| AC-02 | test_FUN_XXX_YY_ZZ_AC_02_<slug> | ... | ... | ... |
+## 7. Trace Links
+- Parent Feature Design: `../design.md`
+- Function Design: `design.md` or `Covered by ../design.md`
+- Gates: `gates.md`
+- Progress: `progress.md` (**execution-state SSOT**)
+- Code Plan: `code-plan.md`
+- Code Entry: `<address + repo-relative path>`
+- API registry: `/cdase/api/...`
 
-## 6. Gate Checklist (AI MUST enforce)
-- [ ] Required APIs discovered in `/api/modules/*.api.md`.
-- [ ] No duplicate logic exists in current API Registries.
+## 8. Version History
 
-### Requirement Gate
-- [ ] Inputs/Outputs complete
-- [ ] ACs are testable and numbered
-- [ ] Edge cases listed
+| Version | Change Type | Summary | Changed ACs | Risks |
+|---|---|---|---|---|
+| v0.1 | Initial | ... | AC-01 | ... |
 
-### Design Gate
-- [ ] API/SPI frozen and explicit
-- [ ] Linked sequence diagram exists (if belongs to a Feature flow)
-- [ ] Risks documented
-
-### Development Gate
-- [ ] Contract tests generated and indexed here
-
-### Test Gate
-- [ ] All contract tests pass
-- [ ] Regression checklist pass (if exists)
-
-### Acceptance Gate
-- [ ] All contract tests pass
-
-## 7. Trace Links (Repo-local, MUST stay valid)
-- Tests: `/tests/contract/test_FUN_XXX_YY_ZZ.py`
-- Code Entry: `<module>.<class>.<method>` + file path
-- Code Plan: `/requirements/function/FUN-XXX_YY_ZZ.plan.md`
-
-### 10. Version History
-- v0.1
-  - Type: Initial | Extension | Breaking
-  - Summary:
-  - Changed ACs:
-  - Introduced Risks:
-
-## 11. Referenced By
-
-## 12. Risks & Non-Breakable Invariants (optional)
-- R-01: <risk> (how to detect: <test/log/assert>)
-- INV-01: <must never happen> (how enforced: <test/assert>)
+## 9. Referenced By
+- FTR-...
 
 

@@ -1,10 +1,14 @@
-"""Trust policy — repo roster is SSOT; hub may have extra users/messages."""
+"""Trust policy — active project member records are SSOT."""
 
 from __future__ import annotations
 
 
-def trusted_uuid_set(roster: list[dict]) -> set[str]:
-    return {m["uuid"] for m in roster if m.get("uuid")}
+def trusted_uuid_set(members: list[dict]) -> set[str]:
+    return {
+        m["uuid"]
+        for m in members
+        if m.get("uuid") and m.get("status", "active") == "active"
+    }
 
 
 def classify_hub_user(hub_user: dict, trusted: set[str]) -> dict:
@@ -19,31 +23,40 @@ def classify_hub_user(hub_user: dict, trusted: set[str]) -> dict:
         "note": (
             None
             if in_roster
-            else "On hub but not in your users.context.md — ask user to confirm before trusting"
+            else "On Hub but not an active project member — ask before trusting"
         ),
     }
 
 
 def merge_team(roster: list[dict], hub_users: list[dict]) -> list[dict]:
-    """Roster SSOT + hub superset (hub may have users not yet in repo)."""
+    """Project-member SSOT + Hub superset."""
     trusted = trusted_uuid_set(roster)
     hub_by_uuid = {u.get("uuid"): u for u in hub_users if u.get("uuid")}
-    roster_uuids = trusted
+    roster_uuids = {m.get("uuid") for m in roster if m.get("uuid")}
     members: list[dict] = []
 
     for m in roster:
+        member_active = m.get("status", "active") == "active"
+        member_trusted = member_active and m.get("committed", True)
         hub = hub_by_uuid.get(m["uuid"], {})
-        active = bool(hub.get("active"))
+        online = member_trusted and bool(hub.get("active"))
         members.append({
+            "alias": m.get("alias") or m["name"],
             "name": m["name"],
             "uuid": m["uuid"],
             "role": m.get("role") or hub.get("role"),
             "in_roster": True,
-            "trusted": True,
-            "online": active,
-            "status": "online" if active else "offline",
+            "trusted": member_trusted,
+            "online": online,
+            "status": (
+                "online" if online
+                else "inactive" if not member_active
+                else "pending" if not member_trusted
+                else "offline"
+            ),
+            "commit_state": m.get("commit_state"),
             "last_seen": hub.get("last_seen"),
-            "source": "roster",
+            "source": "member",
         })
 
     for hu in hub_users:
@@ -73,8 +86,8 @@ def classify_message(msg: dict, trusted: set[str]) -> dict:
     if not trusted_sender:
         out["status"] = "unknown_sender"
         out["note"] = (
-            f"Sender {msg.get('from') or from_uuid} is not in your users.context.md. "
-            "Show to user; do NOT auto-reply until user confirms they are safe to trust."
+            f"Sender {msg.get('from') or from_uuid} is not an active project member. "
+            "Show the user; do NOT auto-reply until they approve a member record."
         )
     else:
         out["status"] = "trusted"

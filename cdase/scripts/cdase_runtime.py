@@ -16,7 +16,16 @@ def find_cdase_root(scripts_dir: Path) -> Path:
     Set CDASE_ROOT explicitly when multiple consumer repos exist in the workspace.
     """
     if env := os.environ.get("CDASE_ROOT"):
-        return Path(env).resolve()
+        p = Path(env).resolve()
+        blocked = methodology_roots(scripts_dir)
+        if p in blocked or (p / "SKILL.md").is_file():
+            raise RuntimeError("CDASE_ROOT points to the framework, not an application runtime")
+        has_git_ancestor = any((parent / ".git").exists() for parent in [p.parent, *p.parents])
+        if p.name != "cdase" or (
+            not has_git_ancestor and os.environ.get("CDASE_TESTING") != "1"
+        ):
+            raise RuntimeError("CDASE_ROOT must be an application cdase/ directory inside Git")
+        return p
 
     resolved = resolve_consumer_cdase_root(scripts_dir)
     if resolved is not None:
@@ -34,4 +43,9 @@ def find_cdase_root(scripts_dir: Path) -> Path:
     if info["consumer_repos_without_cdase"]:
         return consumer_cdase_dir(Path(info["consumer_repos_without_cdase"][0]["path"])).resolve()
 
+    if info.get("scenario") == "1_framework_only":
+        raise RuntimeError(
+            "CDASE framework repo is not an application runtime; open the target "
+            "application repo (or its parent workspace) and run `cdase discover`"
+        )
     return (Path.cwd() / "cdase").resolve()

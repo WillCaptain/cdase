@@ -4,6 +4,16 @@ set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
 
+# Hub-only API-pool configuration. This file is server-local and MUST NOT be
+# copied into client/repository setting.context.md.
+ENV_FILE="${CDASE_HUB_ENV:-$DIR/hub.env}"
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  set +a
+fi
+
 JAVA_BIN="${JAVA_BIN:-}"
 if [[ -z "$JAVA_BIN" ]]; then
   for c in \

@@ -1,0 +1,119 @@
+name: CDASE API Registry Sync
+
+on:
+  pull_request:
+    paths:
+      - "cdase/api/modules/*.api.md"
+  push:
+    branches: [main, master]
+    paths:
+      - "cdase/api/modules/*.api.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-api-pool:
+    runs-on: ubuntu-latest
+    env:
+      CDASE_HUB_URL: ${{ vars.CDASE_HUB_URL || 'https://12th.ai/cdase' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate registry JSON blocks
+        shell: bash
+        run: |
+          shopt -s nullglob
+          registries=(cdase/api/modules/*.api.md)
+          if (( ${#registries[@]} == 0 )); then
+            echo "No module API registries found"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json, pathlib, re, sys
+          pattern = re.compile(r"```json\s+cdase-api\s*\n(.*?)\n```", re.DOTALL)
+          errors = []
+          for path in pathlib.Path("cdase/api/modules").glob("*.api.md"):
+              text = path.read_text()
+              blocks = pattern.findall(text)
+              if not blocks:
+                  errors.append(f"{path}: no cdase-api blocks")
+              for index, block in enumerate(blocks, start=1):
+                  try:
+                      json.loads(block)
+                  except json.JSONDecodeError as exc:
+                      errors.append(f"{path} block {index}: {exc}")
+          if errors:
+              print("\n".join(errors))
+              sys.exit(1)
+          print(f"validated {len(list(pathlib.Path('cdase/api/modules').glob('*.api.md')))} registries")
+          PY
+
+      - name: Verify derived Hub projection
+        shell: bash
+        run: |
+          shopt -s nullglob
+          registries=(cdase/api/modules/*.api.md)
+          if (( ${#registries[@]} == 0 )); then
+            echo "No module API registries found"
+            exit 0
+          fi
+          if command -v cdase >/dev/null 2>&1; then
+            CDASE_CLIENT=(cdase)
+          else
+            CDASE_CLIENT=(python3 cdase/scripts/cdase_client.py)
+          fi
+          for registry in "${registries[@]}"; do
+            "${CDASE_CLIENT[@]}" api-sync "$registry" --check
+          done
+
+  sync-api-pool:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: verify-api-pool
+    runs-on: ubuntu-latest
+    env:
+      CDASE_HUB_URL: ${{ vars.CDASE_HUB_URL || secrets.CDASE_HUB_URL || 'https://12th.ai/cdase' }}
+      CDASE_KB_WRITE_TOKEN: ${{ secrets.CDASE_KB_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync changed registries to Hub
+        shell: bash
+        run: |
+          if [[ -z "${CDASE_KB_WRITE_TOKEN:-}" ]]; then
+            echo "CDASE_KB_WRITE_TOKEN secret is required for protected-branch sync"
+            exit 1
+          fi
+          shopt -s nullglob
+          registries=(cdase/api/modules/*.api.md)
+          if (( ${#registries[@]} == 0 )); then
+            echo "No module API registries found"
+            exit 0
+          fi
+          if command -v cdase >/dev/null 2>&1; then
+            CDASE_CLIENT=(cdase)
+          else
+            CDASE_CLIENT=(python3 cdase/scripts/cdase_client.py)
+          fi
+          for registry in "${registries[@]}"; do
+            "${CDASE_CLIENT[@]}" api-sync "$registry"
+            "${CDASE_CLIENT[@]}" api-sync "$registry" --check
+          done
+
+# Install this as .github/workflows/cdase-api-registry-sync.yml and make
+# verify-api-pool required on protected branches. PR runs are read-only
+# (--check only). Push/main sync uses CDASE_KB_WRITE_TOKEN. Prefer
+# legacy-api-upload for first-time LEGACY_IMPORT; keep manual upload as recovery.

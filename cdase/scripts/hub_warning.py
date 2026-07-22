@@ -28,7 +28,7 @@ def build_hub_warning(
     message = (
         f"CDASE Hub is unreachable at {hub_url}.\n"
         f"{error}\n"
-        f"Start locally: cd hub && mvn -q package && java -jar target/cdase-hub-1.0.0.jar\n"
+        f"Start locally: cd hub && mvn -q package && java -jar target/cdase-hub-1.1.0.jar\n"
         f"{impact}"
     )
 

@@ -40,7 +40,10 @@ def resolve_repo_path(raw: str, cdase_root: Path, git_root: Path | None) -> tupl
 
     path = path.resolve()
 
-    for forbidden in FORBIDDEN_PREFIXES:
+    forbidden_prefixes = list(FORBIDDEN_PREFIXES)
+    if global_override := os.environ.get("CDASE_GLOBAL"):
+        forbidden_prefixes.append(Path(global_override).expanduser())
+    for forbidden in forbidden_prefixes:
         try:
             path.relative_to(forbidden.resolve())
             return None, f"path is outside repo boundary (forbidden area: {forbidden})"
@@ -79,10 +82,12 @@ def classify_message_body(body: str, git_root: Path | None) -> str | None:
     """Best-effort warning if body appears to reference outside-repo secrets."""
     if git_root is None:
         return None
-    home = str(Path.home())
-    if home in body and str(git_root) not in body:
-        for marker in ("/.cdase", "/.cursor/cdase", "/.ssh/", "/.env", "API_KEY", "SECRET"):
-            if marker in body:
+    normalized = body.replace("\\", "/").casefold()
+    home = str(Path.home()).replace("\\", "/").casefold()
+    repo = str(git_root).replace("\\", "/").casefold()
+    if home in normalized and repo not in normalized:
+        for marker in ("/.cdase", "/.cursor/cdase", "/.ssh/", "/.env", "api_key", "secret"):
+            if marker in normalized:
                 return (
                     f"message may contain out-of-repo sensitive paths or secrets ({marker}); "
                     "get user permission before sending"

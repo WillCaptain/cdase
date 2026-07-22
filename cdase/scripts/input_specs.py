@@ -15,7 +15,7 @@ from context_loader import global_cdase_dir
 
 _RENDER_HINT = (
     "Generic order (all hosts): (1) map this spec to your host's richest matching "
-    "input UI for kind=choice|form; (2) only if unavailable, ask with fallback_prompt. "
+    "input UI for kind=choice|multi_choice|form; (2) only if unavailable, ask with fallback_prompt. "
     "Do not assume a specific product's widgets. Never open a browser or external page."
 )
 
@@ -36,7 +36,7 @@ USER_SCOPE = {
     "kind": "choice",
     "prompt": "Where should this identity change apply?",
     "description": (
-        "Global = all repos (~/.cdase/user.context.md). "
+        "Global = all repos (<GLOBAL_CDASE>/user.context.md). "
         "This repo = override for the current project only "
         "(<repo>/cdase/context/user.context.md, gitignored)."
     ),
@@ -61,8 +61,8 @@ USER_PROFILE = {
     "kind": "form",
     "title": "CDASE profile (global)",
     "description": (
-        "Writes ~/.cdase/user.context.md (all agents/projects). "
-        "UUID is resolved from each repo roster by Name — do not enter UUID here."
+        "Writes <GLOBAL_CDASE>/user.context.md (all agents/projects). "
+        "User ID is derived from this machine — do not enter it here."
     ),
     "fields": [
         {"key": "Name", "label": "Name", "required": True, "placeholder": "your name"},
@@ -73,7 +73,7 @@ USER_PROFILE = {
     "fallback_prompt": "Global profile — reply with Name (required), Role, Team, Organization.",
     "on_submit": {
         "handler": "agent",
-        "command_hint": "python3 scripts/cdase_client.py apply-global-user --json '<values>'",
+        "command_hint": "cdase apply-global-user --json '<values>'",
     },
 }
 
@@ -83,8 +83,8 @@ USER_PROFILE_REPO = {
     "title": "CDASE profile (this repo only)",
     "description": (
         "Writes <repo>/cdase/context/user.context.md (gitignored). "
-        "Overrides global Name/Role for this project only. "
-        "Name must still exist in this repo's users.context.md roster."
+        "Overrides global Alias/Role for this project only. On boot, the resolved "
+        "values are published to this machine's committed member record."
     ),
     "fields": [
         {"key": "Name", "label": "Name", "required": True, "placeholder": "name for this repo"},
@@ -95,7 +95,7 @@ USER_PROFILE_REPO = {
     "fallback_prompt": "Repo override — reply with Name (required), Role, Team, Organization.",
     "on_submit": {
         "handler": "agent",
-        "command_hint": "python3 scripts/cdase_client.py apply-repo-user --json '<values>'",
+        "command_hint": "cdase apply-repo-user --json '<values>'",
     },
 }
 
@@ -115,7 +115,36 @@ HUB_ADDRESS = {
     "fallback_prompt": "What is the CDASE hub URL? (e.g. http://127.0.0.1:7423)",
     "on_submit": {
         "handler": "agent",
-        "command_hint": "python3 scripts/cdase_client.py apply-global-setting --json '{\"Address\":\"...\"}'",
+        "command_hint": "cdase apply-global-setting --json '{\"Address\":\"...\"}'",
+    },
+}
+
+LEGACY_API_APPROVAL = {
+    "preset": "legacy.api.approval",
+    "kind": "multi_choice",
+    "title": "Approve legacy APIs for registry generation and upload",
+    "description": (
+        "Dynamic options come from a scan report. Prefer "
+        "`legacy-approval-spec --report <scan.json>`. HIGH candidates default "
+        "selected; user may choose any HIGH/MEDIUM/LOW combination."
+    ),
+    "options": [],
+    "shortcuts": [
+        {"id": "high", "label": "HIGH only (recommended)"},
+        {"id": "high_medium", "label": "HIGH + MEDIUM"},
+        {"id": "all", "label": "All candidates"},
+        {"id": "none", "label": "Upload none"},
+    ],
+    "fallback_prompt": (
+        "Reply with candidate IDs to approve, comma-separated; "
+        "or HIGH, HIGH+MEDIUM, ALL, NONE."
+    ),
+    "on_submit": {
+        "handler": "agent",
+        "command_hint": (
+            "legacy-api-apply --report <report.json> "
+            "--selection-json '{\"selected\":[\"...\"]}'"
+        ),
     },
 }
 
@@ -125,6 +154,8 @@ SPECS: dict[str, dict] = {
     "user.profile": USER_PROFILE,
     "user.profile.repo": USER_PROFILE_REPO,
     "hub.address": HUB_ADDRESS,
+    "legacy.api.approval": LEGACY_API_APPROVAL,
+    "legacy-api-approval": LEGACY_API_APPROVAL,
 }
 
 

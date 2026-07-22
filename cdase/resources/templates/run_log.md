@@ -29,10 +29,14 @@ Notes:
 
 ## Gate Summary
 
-Scenario: PASS | FAIL
-Design: PASS | FAIL
-Feature Acceptance: PASS | FAIL
-Function Acceptance: PASS | FAIL
+Target Feature: FTR-XXX-YY (`SCN-XXX/FTR-YY/`)
+Target Functions: FUN-XXX-YY-ZZ
+Requirement Gate: PASS | FAIL (`gates.md`)
+Design Gate: PASS | FAIL (`gates.md`)
+Development Gate: PASS | FAIL (`gates.md`)
+Test Gate: PASS | FAIL (`gates.md`)
+Acceptance Gate: PASS | FAIL (`gates.md`)
+Final Progress Status: <copied from progress.md>
 
 ---
 

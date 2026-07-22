@@ -1,4 +1,4 @@
-"""Machine-as-user identity: this PC is this roster/hub user id."""
+"""Machine-as-user identity and conflict-free project member records."""
 
 from __future__ import annotations
 
@@ -7,6 +7,15 @@ import os
 import platform
 import uuid as uuid_lib
 from pathlib import Path
+
+
+def _member_field(label: str, value: str | None, *, default: str | None = None) -> str:
+    normalized = str(value if value is not None else default or "").strip()
+    if not normalized:
+        raise ValueError(f"member {label} is required")
+    if normalized.startswith("[") or any(ord(char) < 32 or ord(char) == 127 for char in normalized):
+        raise ValueError(f"member {label} contains invalid control characters")
+    return normalized
 
 
 def raw_machine_id() -> str:
@@ -20,100 +29,81 @@ def machine_user_id(raw: str | None = None) -> str:
     return hashlib.sha256(material).hexdigest()[:8]
 
 
-def find_roster_member(roster: list[dict], user_id: str) -> dict | None:
+def find_member(members: list[dict], user_id: str) -> dict | None:
     from context_loader import normalize_user_id
 
     needle = normalize_user_id(user_id)
-    return next((m for m in roster if m.get("uuid") == needle), None)
+    return next((m for m in members if m.get("uuid") == needle), None)
 
 
-def append_roster_member(
+def write_member_record(
     cdase_root: Path,
     *,
     name: str,
     user_id: str,
     role: str | None = None,
+    status: str = "active",
 ) -> Path:
-    """Append Name|UUID|Role to users.context.md (UUID column = machine_user_id)."""
-    from context_loader import is_valid_user_id, normalize_user_id
+    """Create or update this user's independent committed member record."""
+    from context_loader import USER_ID_RE, normalize_user_id
 
-    path = cdase_root / "context" / "users.context.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
     uid = normalize_user_id(user_id)
-    if not is_valid_user_id(uid):
-        raise ValueError(f"invalid user id: {user_id}")
-    role_cell = role or "developer"
-    row = f"| {name} | {uid} | {role_cell} |"
-
-    if not path.exists():
-        path.write_text(
-            "# Team Roster (SSOT)\n\n"
-            "> UUID column = machine-derived user id (8 hex). Different machine = different user.\n\n"
-            "| Name | UUID | Role |\n"
-            "|------|------|------|\n"
-            f"{row}\n",
-            encoding="utf-8",
-        )
-        return path
-
-    text = path.read_text(encoding="utf-8")
-    if f"| {uid} |" in text or f"|{uid}|" in text:
-        return path
-
-    lines = text.splitlines()
-    insert_at = None
-    in_table = False
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("|") and ("UUID" in stripped or "Name" in stripped) and "---" not in stripped:
-            in_table = True
-            continue
-        if in_table and stripped.startswith("|--"):
-            continue
-        if in_table and stripped.startswith("|"):
-            insert_at = i + 1
-            continue
-        if in_table and not stripped.startswith("|"):
-            insert_at = i
-            break
-    if insert_at is None:
-        if not any("UUID" in ln and "Name" in ln for ln in lines):
-            lines.extend(["", "| Name | UUID | Role |", "|------|------|------|", row])
-        else:
-            lines.append(row)
-    else:
-        lines.insert(insert_at, row)
-    ending = "\n" if text.endswith("\n") else ""
-    path.write_text("\n".join(lines) + ending, encoding="utf-8")
+    if not USER_ID_RE.fullmatch(uid):
+        raise ValueError(f"member user id must be 8 lowercase hex: {user_id}")
+    if status not in {"active", "inactive"}:
+        raise ValueError(f"invalid member status: {status}")
+    alias = _member_field("Alias", name)
+    member_role = _member_field("Role", role, default="developer")
+    members_dir = cdase_root / "context" / "members"
+    members_dir.mkdir(parents=True, exist_ok=True)
+    path = members_dir / f"{uid}.context.md"
+    path.write_text(
+        "\n".join([
+            "# Project Member",
+            "",
+            f"- User ID: {uid}",
+            f"- Alias: {alias}",
+            f"- Role: {member_role}",
+            f"- Status: {status}",
+            "",
+        ]),
+        encoding="utf-8",
+    )
     return path
 
 
-def ensure_machine_on_roster(cdase_root: Path) -> dict:
-    """Ensure this machine has a roster row; add from global Name if needed.
+def ensure_machine_member(cdase_root: Path) -> dict:
+    """Ensure this machine has a committed project member record.
 
-    Returns action: found | added | need_name
+    Returns action: found | added | updated | need_name.
     """
-    from context_loader import global_user_name, load_roster, load_user_context
+    from context_loader import load_members, load_user_context
 
     raw = raw_machine_id()
     uid = machine_user_id(raw)
-    roster = load_roster(cdase_root)
-    match = find_roster_member(roster, uid)
+    members = load_members(cdase_root)
+    match = find_member(members, uid)
+    user = load_user_context(cdase_root)
+    name = user.get("name")
+    role = user.get("role") or "developer"
     if match:
+        changed = match.get("name") != name or (match.get("role") or "developer") != role
+        path = Path(match["path"])
+        if changed and name:
+            path = write_member_record(
+                cdase_root, name=name, user_id=uid, role=role, status=match.get("status", "active")
+            )
         return {
             "ok": True,
-            "action": "found",
+            "action": "updated" if changed and name else "found",
             "user_id": uid,
             "machine_id": raw,
-            "name": match.get("name"),
-            "role": match.get("role"),
-            "roster_path": str(cdase_root / "context" / "users.context.md"),
-            "agent_rule": "Machine id already on roster — use that Name; login hub with user_id.",
+            "name": name or match.get("name"),
+            "role": role,
+            "member_path": str(path),
+            "agent_rule": "Machine member record resolved; use its id for assignments and Hub login.",
         }
 
-    global_name = global_user_name()
-    user = load_user_context(cdase_root)
-    name = global_name
     if not name:
         return {
             "ok": False,
@@ -121,15 +111,14 @@ def ensure_machine_on_roster(cdase_root: Path) -> dict:
             "user_id": uid,
             "machine_id": raw,
             "agent_rule": (
-                "Machine id not on roster and global Name missing. "
+                "Machine has no member record and no global/repo Alias. "
                 "Run input-spec user-profile → apply-global-user, then boot again "
-                "(boot will append this machine to users.context.md)."
+                "(boot will create this machine's member file)."
             ),
-            "next_step": "python3 scripts/cdase_client.py input-spec user-profile",
+            "next_step": "cdase input-spec user-profile",
         }
 
-    role = user.get("role") or "developer"
-    path = append_roster_member(cdase_root, name=name, user_id=uid, role=role)
+    path = write_member_record(cdase_root, name=name, user_id=uid, role=role)
     return {
         "ok": True,
         "action": "added",
@@ -137,9 +126,9 @@ def ensure_machine_on_roster(cdase_root: Path) -> dict:
         "machine_id": raw,
         "name": name,
         "role": role,
-        "roster_path": str(path),
+        "member_path": str(path),
         "agent_rule": (
-            f"Added '{name}' ({uid}) to users.context.md for this machine. "
-            "Commit the roster when ready. Repo Name can later differ from global Name."
+            f"Created member '{name}' ({uid}). Commit {path.name}; "
+            "a repo-local profile may publish a project-specific Alias."
         ),
     }

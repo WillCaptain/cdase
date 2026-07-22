@@ -1,5 +1,6 @@
 package com.cdase.hub.http;
 
+import com.cdase.hub.apipool.ApiPoolRuntime;
 import com.cdase.hub.store.HubStore;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -22,12 +23,14 @@ public final class HubHttpServer {
     private final String host;
     private final int port;
     private final HubStore store;
+    private final ApiPoolRuntime apiPool;
     private HttpServer server;
 
-    public HubHttpServer(String host, int port, HubStore store) {
+    public HubHttpServer(String host, int port, HubStore store, ApiPoolRuntime apiPool) {
         this.host = host;
         this.port = port;
         this.store = store;
+        this.apiPool = apiPool;
     }
 
     public void start() throws IOException, InterruptedException {
@@ -43,8 +46,12 @@ public final class HubHttpServer {
         public void handle(HttpExchange exchange) throws IOException {
             try {
                 route(exchange);
+            } catch (IllegalArgumentException e) {
+                respond(exchange, 400, Map.of("error", message(e)));
+            } catch (IllegalStateException e) {
+                respond(exchange, 409, Map.of("error", message(e)));
             } catch (Exception e) {
-                respond(exchange, 500, Map.of("error", e.getMessage() == null ? "internal error" : e.getMessage()));
+                respond(exchange, 500, Map.of("error", message(e)));
             }
         }
 
@@ -58,7 +65,12 @@ public final class HubHttpServer {
                 return;
             }
             if ("GET".equals(method) && "/health".equals(path)) {
-                respond(exchange, 200, Map.of("ok", true, "service", "cdase-hub", "time", epochNow()));
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("ok", true);
+                payload.put("service", "cdase-hub");
+                payload.put("time", epochNow());
+                payload.put("api_pool", safeApiPoolHealth());
+                respond(exchange, 200, payload);
                 return;
             }
             if ("GET".equals(method) && "/version".equals(path)) {
@@ -106,6 +118,24 @@ public final class HubHttpServer {
                 respond(exchange, 200, Map.of("results", store.kbSearch(q)));
                 return;
             }
+            if ("GET".equals(method) && "/api-pool/health".equals(path)) {
+                respond(exchange, 200, apiPool.service().health());
+                return;
+            }
+            if ("GET".equals(method) && "/api-pool/apis".equals(path)) {
+                String apiId = query.get("api_id");
+                if (apiId == null || apiId.isBlank()) {
+                    respond(exchange, 400, Map.of("error", "query param 'api_id' is required"));
+                    return;
+                }
+                Map<String, Object> result = apiPool.service().get(apiId, query.get("version"));
+                respond(exchange, Boolean.TRUE.equals(result.get("ok")) ? 200 : 404, result);
+                return;
+            }
+            if ("GET".equals(method) && "/api-pool/graph".equals(path)) {
+                respond(exchange, 200, apiPool.service().graph(query.get("system")));
+                return;
+            }
 
             if ("POST".equals(method)) {
                 Map<String, Object> body = readJson(exchange);
@@ -121,6 +151,38 @@ public final class HubHttpServer {
         }
 
         private void handlePost(HttpExchange exchange, String path, Map<String, Object> body) throws Exception {
+            if ("/api-pool/search".equals(path)) {
+                respond(exchange, 200, apiPool.service().search(body));
+                return;
+            }
+            if ("/api-pool/apis".equals(path)) {
+                if (!requireApiPoolWrite(exchange)) {
+                    return;
+                }
+                respond(exchange, 200, apiPool.service().publish(body));
+                return;
+            }
+            if ("/api-pool/transition".equals(path)) {
+                if (!requireApiPoolWrite(exchange)) {
+                    return;
+                }
+                String apiId = str(body.get("api_id"));
+                if (apiId == null || apiId.isBlank()) {
+                    respond(exchange, 400, Map.of("error", "missing fields: api_id"));
+                    return;
+                }
+                respond(exchange, 200, apiPool.service().transition(apiId, body));
+                return;
+            }
+            if ("/api-pool/verify".equals(path)) {
+                Map<String, Object> verified = apiPool.service().verify(body);
+                respond(
+                        exchange,
+                        Boolean.TRUE.equals(verified.get("ok")) ? 200 : 409,
+                        verified
+                );
+                return;
+            }
             switch (path) {
                 case "/login" -> {
                     if (!require(exchange, body, "uuid", "name", "machine_id")) {
@@ -213,6 +275,21 @@ public final class HubHttpServer {
             }
         }
 
+        private boolean requireApiPoolWrite(HttpExchange exchange) throws IOException {
+            if (!apiPool.writesEnabled()) {
+                respond(exchange, 503, Map.of(
+                        "error", "API-pool writes are disabled; configure CDASE_KB_WRITE_TOKEN"
+                ));
+                return false;
+            }
+            if (!apiPool.authorized(exchange.getRequestHeaders().getFirst("Authorization"))) {
+                exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
+                respond(exchange, 401, Map.of("error", "API-pool write authorization required"));
+                return false;
+            }
+            return true;
+        }
+
         private List<String> parseTrust(String raw) {
             if (raw == null || raw.isBlank()) {
                 return List.of();
@@ -301,22 +378,26 @@ public final class HubHttpServer {
             payload.put("version", hubVersion());
             payload.put("time", epochNow());
             payload.put("public_base", "https://12th.ai/cdase");
-            payload.put("endpoints", Map.of(
-                    "health", "GET /health",
-                    "version", "GET /version",
-                    "users", "GET /users?repo_id=",
-                    "messages", "GET /messages?uuid=&trust=",
-                    "login", "POST /login",
-                    "ping", "POST /ping",
-                    "send", "POST /messages",
-                    "ack", "POST /messages/ack",
-                    "kb", "GET|POST /kb"
-            ));
+            Map<String, String> endpoints = new LinkedHashMap<>();
+            endpoints.put("health", "GET /health");
+            endpoints.put("version", "GET /version");
+            endpoints.put("users", "GET /users?repo_id=");
+            endpoints.put("messages", "GET /messages?uuid=&trust=");
+            endpoints.put("login", "POST /login");
+            endpoints.put("ping", "POST /ping");
+            endpoints.put("send", "POST /messages");
+            endpoints.put("ack", "POST /messages/ack");
+            endpoints.put("api_pool_search", "POST /api-pool/search");
+            endpoints.put("api_pool_publish", "POST /api-pool/apis");
+            endpoints.put("api_pool_verify", "POST /api-pool/verify");
+            endpoints.put("api_pool_graph", "GET /api-pool/graph?system=");
+            endpoints.put("legacy_kb", "GET|POST /kb");
+            payload.put("endpoints", endpoints);
             respond(exchange, 200, payload);
         }
 
         private String hubVersion() {
-            return "1.0.0";
+            return "1.1.0";
         }
 
         private Map<String, String> parseQuery(String raw) {
@@ -352,6 +433,20 @@ public final class HubHttpServer {
         private double epochNow() {
             Instant now = Instant.now();
             return now.getEpochSecond() + now.getNano() / 1_000_000_000.0;
+        }
+
+        private Map<String, Object> safeApiPoolHealth() {
+            try {
+                return apiPool.service().health();
+            } catch (Exception e) {
+                return Map.of("ok", false, "error", message(e));
+            }
+        }
+
+        private String message(Exception e) {
+            return e.getMessage() == null || e.getMessage().isBlank()
+                    ? "internal error"
+                    : e.getMessage();
         }
     }
 }

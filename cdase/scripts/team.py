@@ -1,33 +1,35 @@
-"""Team list — repo roster SSOT + hub superset (users on hub not yet in repo)."""
+"""Team list — committed project members plus Hub presence."""
 
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
+from context_loader import member_commit_state
 from trust_policy import merge_team
 
 
-def roster_is_committed(cdase_root: Path, git_root: Path | None) -> bool | None:
+def member_commit_states(cdase_root: Path, git_root: Path | None) -> dict[str, str]:
     if git_root is None:
+        return {}
+    members_dir = cdase_root / "context" / "members"
+    if not members_dir.is_dir():
+        return {}
+    states: dict[str, str] = {}
+    for path in sorted(members_dir.glob("*.context.md")):
+        try:
+            rel = path.resolve().relative_to(git_root.resolve()).as_posix()
+            states[rel] = member_commit_state(path, git_root)
+        except (OSError, ValueError):
+            states[str(path)] = "unknown"
+    return states
+
+
+def members_are_committed(cdase_root: Path, git_root: Path | None) -> bool | None:
+    states = member_commit_states(cdase_root, git_root)
+    if not states:
         return None
-    path = cdase_root / "context" / "users.context.md"
-    if not path.exists():
-        return None
-    try:
-        rel = path.relative_to(git_root.resolve()).as_posix()
-        result = subprocess.run(
-            ["git", "status", "--porcelain", rel],
-            cwd=git_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode != 0:
-            return None
-        return result.stdout.strip() == ""
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return None
+    return all(state == "committed" for state in states.values())
 
 
 def git_contributors(git_root: Path | None, known_names: set[str]) -> list[dict]:
@@ -68,7 +70,7 @@ def git_contributors(git_root: Path | None, known_names: set[str]) -> list[dict]
             "status": "git_only",
             "source": "git",
             "in_roster": False,
-            "note": "Git contributor only — not in users.context.md",
+            "note": "Git contributor only — not an active project member",
         })
     return out
 
@@ -79,12 +81,19 @@ def team_summary(
     hub_offline: bool = False,
     git_only: list[dict] | None = None,
 ) -> str:
-    roster = [m for m in members if m.get("in_roster")]
-    online = [m for m in roster if m.get("online")]
+    project_members = [m for m in members if m.get("in_roster")]
+    trusted = [m for m in project_members if m.get("trusted")]
+    online = [m for m in trusted if m.get("online")]
+    inactive = [m for m in project_members if m.get("status") == "inactive"]
+    pending = [m for m in project_members if m.get("status") == "pending"]
     new_to_you = [m for m in members if m.get("status") == "new_to_you"]
-    parts = [f"{len(roster)} in roster ({len(online)} online)"]
+    parts = [f"{len(trusted)} active members ({len(online)} online)"]
+    if inactive:
+        parts.append(f"{len(inactive)} inactive")
+    if pending:
+        parts.append(f"{len(pending)} pending commit")
     if new_to_you:
-        parts.append(f"{len(new_to_you)} on hub, new to you (not in roster)")
+        parts.append(f"{len(new_to_you)} on Hub, new to you")
     if git_only:
         parts.append(f"{len(git_only)} git-only")
     if hub_offline:
@@ -94,24 +103,35 @@ def team_summary(
 
 def build_agent_team_brief(user: dict, members: list[dict], *, hub_offline: bool = False) -> dict:
     me = (user.get("name") or "").strip().lower()
-    roster_rows = [m for m in members if m.get("in_roster")]
+    trusted_rows = [m for m in members if m.get("trusted")]
+    inactive_rows = [m for m in members if m.get("status") == "inactive"]
+    pending_rows = [m for m in members if m.get("status") == "pending"]
     new_rows = [m for m in members if m.get("status") == "new_to_you"]
 
     lines: list[str] = []
     if me:
         lines.append(f"You ({user.get('name')}):")
-    lines.append("Trusted team (repo users.context.md):")
-    for m in roster_rows:
+    lines.append("Trusted team (committed project member records):")
+    for m in trusted_rows:
         mark = " (you)" if (m.get("name") or "").lower() == me else ""
         st = m.get("status", "offline")
         lines.append(f"  • {m['name']} — {st}{mark}")
 
     if new_rows and not hub_offline:
-        lines.append("New on hub (NOT in your roster — ask user to confirm before trusting):")
+        lines.append("New on Hub (no active member record — confirm before trusting):")
         for m in new_rows:
             lines.append(f"  • {m.get('name')} — new_to_you")
 
-    others = [m for m in roster_rows if (m.get("name") or "").lower() != me]
+    if inactive_rows:
+        lines.append("Inactive project members:")
+        for m in inactive_rows:
+            lines.append(f"  • {m.get('name')} — inactive")
+    if pending_rows:
+        lines.append("Pending member records (commit required):")
+        for m in pending_rows:
+            lines.append(f"  • {m.get('name')} — {m.get('commit_state') or 'pending'}")
+
+    others = [m for m in trusted_rows if (m.get("name") or "").lower() != me]
     return {
         "agent_brief": "\n".join(lines),
         "others_count": len(others) + len(new_rows),
@@ -119,7 +139,7 @@ def build_agent_team_brief(user: dict, members: list[dict], *, hub_offline: bool
         "must_use_this_brief": True,
         "must_not_auto_trust": [m.get("name") for m in new_rows if m.get("name")],
         "agent_rule": (
-            "Repo users.context.md = trust SSOT. Hub may list extra users (new_to_you). "
-            "Never auto-reply to messages from new_to_you until user_b confirms and adds them to roster."
+            "Active committed member records are the trust SSOT. Hub may list extra users "
+            "(new_to_you). Never auto-reply until the user confirms and adds a member record."
         ),
     }

@@ -4,10 +4,17 @@
 > emits a **declarative input spec**. The **agent** maps that spec onto **whatever input
 > UI its host provides**. Order is always the same; the concrete widget differs by agent.
 
+`<CDASE_CLIENT>` means installed `cdase` after `python -m pip install .`
+(Windows: `py -m pip install .`), with the bundled
+`python3 <skill-root>/scripts/cdase_client.py` fallback.
+`<GLOBAL_CDASE>` means `CDASE_GLOBAL` when set, else `~/.cdase` on
+macOS/Linux or `%USERPROFILE%\.cdase` on Windows.
+
 ## Generic render order (mandatory for every host)
 
 1. Run `input-spec PRESET` → get `kind`, `options` / `fields`, `fallback_prompt`, `render_hint`.
-2. **Use the host’s richest matching input UI** for that `kind` (choice → options UI; form → fields UI).
+2. **Use the host’s richest matching input UI** for that `kind`
+   (choice → options UI; multi_choice → multi-select UI; form → fields UI).
 3. If that UI is missing or fails → **plain text** using `fallback_prompt`.
 4. Never open a browser; never invent a CDASE-owned HTML page.
 
@@ -18,7 +25,7 @@ implements step 2 with its own primitives.
 
 There is no one cross-agent widget API. So CDASE stays **instruction-level**:
 
-- Spec = what to ask (`choice` / `form` + fields).
+- Spec = what to ask (`choice` / `multi_choice` / `form` + options/fields).
 - Host = how to show it (that product’s buttons, pickers, slash UI, TUI, …).
 - Text = universal floor when the host has no structured input.
 
@@ -27,6 +34,7 @@ There is no one cross-agent widget API. So CDASE stays **instruction-level**:
 | Spec `kind` | Intent | Host maps to (examples — not exhaustive) |
 |---|---|---|
 | `choice` | Pick one option | yes/no buttons, multiple-choice, select list, numbered menu |
+| `multi_choice` | Pick zero or more options | checkbox list, multi-select, grouped numbered menu |
 | `form` | Collect fields | multi-step questions, native form, pick-list for `options` fields |
 
 Illustrative only: Cursor may use question cards; a CLI may use a TUI select; another IDE
@@ -35,11 +43,11 @@ may use its own picker. **Same order, different chrome.**
 ## Get an input spec
 
 ```bash
-python3 scripts/cdase_client.py input-spec session-gate
-python3 scripts/cdase_client.py input-spec user-scope
-python3 scripts/cdase_client.py input-spec user-profile
-python3 scripts/cdase_client.py input-spec user-profile-repo
-python3 scripts/cdase_client.py input-spec hub-address
+<CDASE_CLIENT> input-spec session-gate
+<CDASE_CLIENT> input-spec user-scope
+<CDASE_CLIENT> input-spec user-profile
+<CDASE_CLIENT> input-spec user-profile-repo
+<CDASE_CLIENT> input-spec hub-address
 ```
 
 ## Identity: global vs this-repo (mandatory clarity)
@@ -48,7 +56,7 @@ Identity can live in two places. The agent MUST NOT guess.
 
 | Scope | File | When |
 |---|---|---|
-| **global** | `~/.cdase/user.context.md` | First boot (missing global), or user wants all projects |
+| **global** | `<GLOBAL_CDASE>/user.context.md` | First boot (missing global), or user wants all projects |
 | **repo** | `<repo>/cdase/context/user.context.md` (gitignored) | Override for this project only |
 
 ### Agent rule
@@ -68,13 +76,17 @@ Identity can live in two places. The agent MUST NOT guess.
 | `user.profile` | form | `input-spec user-profile` | `apply-global-user --json '{...}'` |
 | `user.profile.repo` | form | `input-spec user-profile-repo` | `apply-repo-user --json '{...}'` |
 | `hub.address` | form | `input-spec hub-address` | `apply-global-setting --json '{...}'` |
+| `legacy.api.approval` | multi_choice | `legacy-approval-spec --report …` | `legacy-api-apply --selection-json '{...}'` |
 
 ## Bootstrap flow (identity)
 
-1. Global `~/.cdase/user.context.md` missing → `input-spec user-profile`.
+1. Global `<GLOBAL_CDASE>/user.context.md` missing → `input-spec user-profile`.
 2. Render with **host UI first** (generic order above); text only if unavailable.
-3. `apply-global-user --json '...'` writes `~/.cdase/user.context.md` (or `$CDASE_GLOBAL`).
-4. Continue charter boot (`boot` / `check`, machine roster, lazy `login`).
+3. `apply-global-user --json '...'` writes `<GLOBAL_CDASE>/user.context.md`.
+4. Continue with `check`; run `boot` only when state is missing. Boot publishes
+   the optional repo Alias/Role override to the machine's committed member record.
+   Then run `sync` after
+   identity and explicit Hub URL are valid.
 
 > Session gate (`input-spec session-gate`) uses the same generic order: host choice UI
 > if any; else plain “yes / no”.

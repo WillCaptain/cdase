@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "./hooks/session-start.sh"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "./hooks/before-submit-sync.sh"
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "./hooks/before-read-members.sh",
+        "matcher": "context[/\\\\]members[/\\\\][0-9a-f]{8}\\.context\\.md"
+      }
+    ]
+  }
+}

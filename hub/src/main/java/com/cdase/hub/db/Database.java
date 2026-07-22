@@ -11,10 +11,11 @@ import java.sql.Statement;
 
 public final class Database implements AutoCloseable {
 
+    private final String url;
     private final Connection connection;
 
     public Database(Path dbFile) throws SQLException, IOException {
-        String url = "jdbc:h2:" + dbFile.toAbsolutePath() + ";DATABASE_TO_LOWER=TRUE";
+        url = "jdbc:h2:" + dbFile.toAbsolutePath() + ";DATABASE_TO_LOWER=TRUE";
         connection = DriverManager.getConnection(url, "sa", "");
         initSchema();
     }
@@ -39,6 +40,10 @@ public final class Database implements AutoCloseable {
 
     public Connection connection() {
         return connection;
+    }
+
+    public Connection openConnection() throws SQLException {
+        return DriverManager.getConnection(url, "sa", "");
     }
 
     @Override

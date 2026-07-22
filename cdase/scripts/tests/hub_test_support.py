@@ -12,7 +12,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-HUB_JAR = REPO_ROOT / "hub" / "target" / "cdase-hub-1.0.0.jar"
+HUB_JAR = REPO_ROOT / "hub" / "target" / "cdase-hub-1.1.0.jar"
 DEFAULT_TEST_PORT = 17423
 
 
@@ -36,9 +36,10 @@ def wait_for_hub(url: str, *, timeout_sec: float = 15.0) -> bool:
 class EphemeralHub:
     """Start cdase-hub on an isolated port + data dir for integration tests."""
 
-    def __init__(self, port: int = DEFAULT_TEST_PORT):
+    def __init__(self, port: int = DEFAULT_TEST_PORT, env: dict[str, str] | None = None):
         self.port = port
         self.url = f"http://127.0.0.1:{port}"
+        self.env = env or {}
         self._proc: subprocess.Popen | None = None
         self._data_dir: tempfile.TemporaryDirectory | None = None
 
@@ -53,6 +54,8 @@ class EphemeralHub:
 
         self._data_dir = tempfile.TemporaryDirectory(prefix="cdase-hub-test-")
         data_path = Path(self._data_dir.name)
+        process_env = os.environ.copy()
+        process_env.update(self.env)
         self._proc = subprocess.Popen(
             [
                 "java",
@@ -64,6 +67,7 @@ class EphemeralHub:
                 str(data_path),
             ],
             cwd=REPO_ROOT / "hub",
+            env=process_env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -92,12 +96,44 @@ class EphemeralHub:
 
 
 def test_app_cdase_root() -> Path:
-    return REPO_ROOT / "test-app" / "cdase"
+    return REPO_ROOT / "tests" / "fixtures" / "app" / "cdase"
+
+
+def ensure_test_member(
+    cdase_root: Path | None = None,
+    *,
+    machine_id: str = "cdase-api-pool-test-machine",
+    alias: str = "api-pool-tester",
+) -> dict[str, str]:
+    """Ensure a stable machine member record exists for integration tests."""
+    import sys
+
+    scripts = REPO_ROOT / "cdase" / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from machine_identity import machine_user_id, write_member_record
+
+    root = cdase_root or test_app_cdase_root()
+    user_id = machine_user_id(machine_id)
+    path = write_member_record(
+        root, name=alias, user_id=user_id, role="developer", status="active"
+    )
+    return {
+        "CDASE_MACHINE_ID": machine_id,
+        "CDASE_ROOT": str(root),
+        "member_path": str(path),
+        "user_id": user_id,
+        "alias": alias,
+    }
 
 
 def run_client(*args: str, env: dict | None = None) -> tuple[int, dict]:
     """Run cdase_client.py; return (exit_code, parsed_json)."""
     merged = os.environ.copy()
+    merged.update({
+        "CDASE_TESTING": "1",
+        "CDASE_TEST_MEMBER_STATE": "committed",
+    })
     if env:
         merged.update(env)
     script = REPO_ROOT / "cdase" / "scripts" / "cdase_client.py"

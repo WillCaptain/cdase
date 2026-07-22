@@ -1,11 +1,13 @@
 # Repo User Override (optional)
 
-> Only when you act as a **different identity** in this project.
-> Default: use global `~/.cdase/user.context.md` + roster UUID lookup.
+> Gitignored current-user Alias/Role override for this project.
+> Default: use `<GLOBAL_CDASE>/user.context.md`.
+> `boot` writes these values into
+> `context/members/<8-hex-user-id>.context.md`; commit that shared record.
 > Template: [user.md](user.md) (this file)
 
 ## Identity
-- Name: [override name for this repo only]
+- Name: [project display alias; published as member Alias]
 - Role: [optional]
 
 ## Capabilities

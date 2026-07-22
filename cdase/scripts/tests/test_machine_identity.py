@@ -13,12 +13,12 @@ from unittest import mock
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from machine_identity import (
-    append_roster_member,
-    ensure_machine_on_roster,
+from machine_identity import (  # noqa: E402
+    ensure_machine_member,
     machine_user_id,
+    write_member_record,
 )
-from context_loader import load_roster, load_user_context, validate_identity
+from context_loader import load_members, load_user_context, validate_identity  # noqa: E402
 
 
 class MachineIdentityTests(unittest.TestCase):
@@ -35,9 +35,9 @@ class MachineIdentityTests(unittest.TestCase):
             root = Path(tmp) / "cdase"
             mid = "test-machine-1"
             uid = machine_user_id(mid)
-            append_roster_member(root, name="will", user_id=uid, role="lead")
+            write_member_record(root, name="will", user_id=uid, role="lead")
             with mock.patch.dict(os.environ, {"CDASE_MACHINE_ID": mid}, clear=False):
-                res = ensure_machine_on_roster(root)
+                res = ensure_machine_member(root)
             self.assertEqual(res["action"], "found")
             self.assertEqual(res["name"], "will")
 
@@ -50,22 +50,19 @@ class MachineIdentityTests(unittest.TestCase):
             )
             root = Path(tmp) / "cdase"
             (root / "context").mkdir(parents=True)
-            (root / "context" / "users.context.md").write_text(
-                "| Name | UUID | Role |\n|------|------|------|\n| bob | 400edd13 | dev |\n",
-                encoding="utf-8",
-            )
+            write_member_record(root, name="bob", user_id="400edd13", role="dev")
             mid = "new-laptop"
             uid = machine_user_id(mid)
             with mock.patch.dict(
                 os.environ, {"CDASE_GLOBAL": str(gdir), "CDASE_MACHINE_ID": mid}, clear=False
             ):
-                res = ensure_machine_on_roster(root)
+                res = ensure_machine_member(root)
                 self.assertEqual(res["action"], "added")
                 self.assertEqual(res["user_id"], uid)
-                roster = load_roster(root)
-                self.assertTrue(any(m["uuid"] == uid and m["name"] == "will" for m in roster))
+                members = load_members(root)
+                self.assertTrue(any(m["uuid"] == uid and m["name"] == "will" for m in members))
                 user = load_user_context(root)
-                ok, errors = validate_identity(user, roster)
+                ok, errors = validate_identity(user, members)
                 self.assertTrue(ok, errors)
 
     def test_ensure_need_name(self):
@@ -74,14 +71,10 @@ class MachineIdentityTests(unittest.TestCase):
             gdir.mkdir()
             root = Path(tmp) / "cdase"
             (root / "context").mkdir(parents=True)
-            (root / "context" / "users.context.md").write_text(
-                "| Name | UUID | Role |\n|------|------|------|\n",
-                encoding="utf-8",
-            )
             with mock.patch.dict(
                 os.environ, {"CDASE_GLOBAL": str(gdir), "CDASE_MACHINE_ID": "x"}, clear=False
             ):
-                res = ensure_machine_on_roster(root)
+                res = ensure_machine_member(root)
             self.assertEqual(res["action"], "need_name")
             self.assertFalse(res["ok"])
 

@@ -3,9 +3,13 @@
 > **How** agents communicate peer-to-peer via Hub.  
 > **Law**: [constitution.md](../constitution.md) §XVI · **Procedure**: [charter.md](../charter.md) §2
 
+`<CDASE_CLIENT>` means installed `cdase` after `python -m pip install .`
+(Windows: `py -m pip install .`), with the bundled
+`python3 <skill-root>/scripts/cdase_client.py` fallback.
+
 ## Identity (no separate agent UUID)
 
-Every message uses a **roster human UUID** as `from_uuid` / `to_uuid`.
+Every message uses an active committed member's id as `from_uuid` / `to_uuid`.
 
 | Field | Meaning |
 |---|---|
@@ -13,7 +17,8 @@ Every message uses a **roster human UUID** as `from_uuid` / `to_uuid`.
 | `to_uuid` | Human recipient (e.g. user_a) |
 | `from_actor` | `human` — user typed/sent · `agent` — agent composed autonomously |
 
-Accountability stays with the human on the roster. `from_actor` marks **who engaged**, not a separate agent identity.
+Accountability stays with the human member. `from_actor` marks **who engaged**,
+not a separate agent identity.
 
 ## Repo boundary (hard rule)
 
@@ -21,7 +26,7 @@ Accountability stays with the human on the roster. `from_actor` marks **who enga
 |---|---|
 | Files under git repository root (committed **or** local unpushed) | **Yes** |
 | `/cdase/**` artifacts, API docs, requirements, design | **Yes** |
-| Environment secrets, `~/.cdase` (or legacy `~/.cursor/cdase`), paths outside repo, private notes | **No** — STOP, ask user |
+| Environment secrets, `<GLOBAL_CDASE>`, paths outside repo, private notes | **No** — STOP, ask user |
 
 `send-file` enforces repo boundary in the client. Free-text `send` runs a best-effort secret/path scan; blocked unless user approves (`--user-approved`).
 
@@ -61,7 +66,7 @@ Accountability stays with the human on the roster. `from_actor` marks **who enga
 3. **agent_b** sends to **user_a**'s UUID:
 
 ```bash
-python3 scripts/cdase_client.py send user_a \
+<CDASE_CLIENT> send user_a \
   "Blocked on FUN-002-01-01. Need invokeable API for OrderService.create. Searched /cdase/api/ — not found." \
   --from-actor agent --intent question --thread-id FUN-002-01-01
 ```
@@ -69,7 +74,7 @@ python3 scripts/cdase_client.py send user_a \
 4. **user_a**'s agent reads inbox, finds answer locally (unpushed file OK), replies:
 
 ```bash
-python3 scripts/cdase_client.py send-file user_b src/order/OrderService.java \
+<CDASE_CLIENT> send-file user_b src/order/OrderService.java \
   --from-actor agent --thread-id FUN-002-01-01 \
   --note "API for FUN-001-01-01 — local unpushed"
 ```
@@ -77,7 +82,7 @@ python3 scripts/cdase_client.py send-file user_b src/order/OrderService.java \
 Or text answer:
 
 ```bash
-python3 scripts/cdase_client.py send user_b \
+<CDASE_CLIENT> send user_b \
   "OrderService.create(orderId): Order — see FUN-001-01-01" \
   --from-actor agent --intent answer --thread-id FUN-002-01-01
 ```
@@ -100,11 +105,11 @@ Always surface agent traffic to the human (sender name, from_actor, thread_id, s
 
 ## Outbound rules (sending agent)
 
-Agents MAY autonomously message roster peers when `AgentAutonomy: delegated` (default).
+Agents MAY autonomously message active member peers when `AgentAutonomy: delegated` (default).
 
 Before send:
 
-1. Recipient in `users.context.md`
+1. Recipient has an active committed `context/members/<user-id>.context.md` record
 2. Content is repo-safe (or user approved)
 3. Message is self-contained (artifact IDs, what was searched, what is needed)
 4. Set `from_actor: agent` and appropriate `intent` + `thread_id`
@@ -113,26 +118,27 @@ Human `@someone` or "tell X …" → `from_actor: human`.
 
 ## Team discovery ("who is on this project?")
 
-**Never use git history** for CDASE team identity. Git authors ≠ roster users.
+**Never use git history** for CDASE team identity. Git authors ≠ CDASE members.
 
 ### Procedure (agent)
 
-1. `python3 scripts/cdase_client.py team` — also auto-refreshes your hub presence (ping or login).
+1. `<CDASE_CLIENT> team` — also auto-refreshes your hub presence (ping or login).
 2. Present merged list (**primary**):
 
 | `status` | Meaning |
 |---|---|
-| `online` | In committed roster **and** active on hub (recent `login`/`ping`) |
-| `offline` | In roster but not active on hub |
-| `hub_only` | On hub but **not** in committed `users.context.md` — often unpushed roster |
+| `online` | Active committed member **and** present on Hub |
+| `offline` | Active committed member but not present on Hub |
+| `hub_only` | Present on Hub but not an active committed member |
 
-3. **Last (supplementary):** `git_contributors` — git authors **not** in roster. FYI only; **not** CDASE team members. Show after CDASE members.
+3. **Last (supplementary):** `git_contributors` — git authors without active
+   member records. FYI only; **not** CDASE team members.
 
 ## Trust model (repo SSOT + hub superset)
 
 | Layer | Role |
 |---|---|
-| **`users.context.md`** (repo) | **Trust SSOT** — who user_b accepts; UUIDs for send/inbox trust |
+| **`context/members/*.context.md`** (repo) | **Trust SSOT** — active records accepted for send/inbox trust |
 | **Hub users** (login) | **Superset** — anyone active on hub, including users not yet in repo |
 | **Hub messages** | All stored; client fetches with `trust=all` and classifies |
 
@@ -140,17 +146,19 @@ Human `@someone` or "tell X …" → `from_actor: human`.
 
 | `status` | Meaning |
 |---|---|
-| `online` / `offline` | In **your** roster |
-| `new_to_you` | On hub, **not** in your `users.context.md` — ask user to confirm before trusting |
+| `online` / `offline` | Active committed member |
+| `new_to_you` | On Hub, not an active committed member — ask before creating/activating a member record |
 
 ### Messages (`sync` / `inbox`)
 
 | `status` | Agent may auto-reply? |
 |---|---|
 | `trusted` | Yes (if `AgentAutonomy: delegated`) |
-| `unknown_sender` | **No** — show message; user must confirm sender is safe and add to roster |
+| `unknown_sender` | **No** — show message; user must confirm sender before creating/activating a member record |
 
-**Rule:** If **will** messages **evan** but will is not in evan's roster yet → evan's agent shows the message and asks evan to confirm — **no automatic reply** to will's agent until evan adds will to `users.context.md`.
+**Rule:** If **will** messages **evan** but will has no active committed member
+record yet, evan's agent shows the message and asks evan to confirm — **no
+automatic reply** until evan creates or activates will's member record.
 
 ### Sources
 
@@ -169,34 +177,36 @@ GET /users?repo_id=github.com/org/aintegration
 POST /login  { "uuid", "name", "machine_id", "repo_id", "trust" }
 ```
 
-### Sources (roster vs hub)
+### Sources (members vs Hub)
 
-Example: **will** works locally in repo A but has not pushed `users.context.md`.
+Example: **will** works locally in repo A but has not pushed the member record.
 **even** in repo B runs `team`:
 
-* will is **not** in even's roster file (not pushed),
-* will **may** appear as `hub_only` + `online` if will used any hub command on the same hub (presence auto-refreshes).
+* will is **not** an active committed member in even's checkout (not pushed),
+* will **may** appear as `hub_only` + `online` after will ran `sync`, `team`,
+  `login`, or `ping` on the same Hub.
 
-After will pushes roster, both machines see will in roster.
+After will pushes the member record, both machines trust will.
 
 ```bash
-python3 scripts/cdase_client.py team   # refreshes your presence automatically
+<CDASE_CLIENT> team   # refreshes your presence automatically
 ```
 
-Hub-touching commands (`check`, `team`, `send`, `inbox`, …) ping or login before the main
-action so teammates see you online without a separate heartbeat step.
+`sync` and `team` ping or login before their main action, so the normal journey
+needs no separate heartbeat step. `check`, `send`, and `inbox` do not themselves
+change presence.
 
 ## CLI reference
 
 ```bash
-python3 scripts/cdase_client.py send <to> "<body>" \
+<CDASE_CLIENT> send <to> "<body>" \
   [--from-actor agent|human] [--intent question|answer|file|...] [--thread-id FUN-xxx]
 
-python3 scripts/cdase_client.py send-file <to> <repo-path> \
+<CDASE_CLIENT> send-file <to> <repo-path> \
   [--note "..."] [--thread-id FUN-xxx] [--from-actor agent]
 
 # Out-of-repo content (user explicitly approved):
-python3 scripts/cdase_client.py send <to> "<body>" --user-approved
+<CDASE_CLIENT> send <to> "<body>" --user-approved
 ```
 
 ## Settings (`setting.context.md` → Messaging)

@@ -1,31 +1,40 @@
-# Scenario: SCN-XXX <Feature Title>
+# Scenario: SCN-XXX — <Scenario Title>
+
+> Canonical path: `/cdase/requirements/SCN-XXX/scenario.md`
+> Scenario documents describe intent. They do not contain implementation design,
+> stage ownership, or gate checklists.
 
 ## 0. Metadata
 - ID: SCN-XXX
-- Steward: <name/team>
+- Steward: <8-hex-user-id> (<project-alias>)
 - Priority: <P0|P1|P2>
 - Version: v0.1
 - Last Updated: <YYYY-MM-DD>
-- Status: <Draft | Stable | Handled>
+- Resolution: <Draft | Stable | Handled | Deprecated>
 
 ## 1. Background
-   - Who is the user or system actor?
-   - What problem are they trying to solve?
+- Actor: <user/system actor>
+- Problem: <problem to solve>
+- Context: <when/where this occurs>
 
 ## 2. Core Scenario
-   - Describe the main flow step by step.
-   - Use natural language.
-   - Focus on “what happens”, not “how it is implemented”.
+1. <Observable step; describe what happens, not implementation>
+2. ...
+3. ...
 
 ## 3. Expected Outcomes
-   - What observable results should occur?
-   - What states or outputs matter to the user?
+- OUT-01: <observable result>
+- OUT-02: ...
 
-## 4. Constraints & Rules
-   - Business rules
-   - Invariants (things that must never happen)
-   - Edge cases (optional but encouraged)
+## 4. Constraints and Invariants
+- C-01: <business/system constraint>
+- INV-01: <must never be violated>
 
-## 5. Evolution Hint (Optional)
-   - Is this a brand new capability?
-   - Or an extension of an existing scenario?
+## 5. Feature Index
+
+| Feature ID | Folder | Purpose |
+|---|---|---|
+| FTR-XXX-YY | `FTR-YY/` | <one-line responsibility> |
+
+## 6. Evolution Notes (Optional)
+- <new capability, extension, deprecation, or compatibility note>

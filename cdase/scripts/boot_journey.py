@@ -20,7 +20,8 @@ def global_setting_exists() -> bool:
 
 
 def consumer_cdase_ready(cdase_root: Path) -> bool:
-    return (cdase_root / "context" / "users.context.md").exists()
+    members = cdase_root / "context" / "members"
+    return members.is_dir() and any(members.glob("*.context.md"))
 
 
 def build_boot_journey(
@@ -33,7 +34,7 @@ def build_boot_journey(
     """Return journey state for agent — what step is next."""
     hub = hub_url_state(settings)
     has_user_file = global_user_exists()
-    has_roster = consumer_cdase_ready(cdase_root)
+    has_members = consumer_cdase_ready(cdase_root)
 
     steps = []
 
@@ -55,7 +56,7 @@ def build_boot_journey(
             "id": "user_profile",
             "label": "Global user profile",
             "status": "needed",
-            "action": "python3 scripts/cdase_client.py input-spec user-profile",
+            "action": "cdase input-spec user-profile",
             "then": "apply-global-user --json '<values>'",
         })
 
@@ -75,7 +76,7 @@ def build_boot_journey(
             "id": "hub_url",
             "label": "Hub Address",
             "status": "needed",
-            "action": "python3 scripts/cdase_client.py init-global-setting",
+            "action": "cdase init-global-setting",
             "then": "or input-spec hub-address → apply-global-setting for a custom URL",
             "note": (
                 "Copy skill templates/setting.context.md → ~/.cdase/ "
@@ -91,7 +92,7 @@ def build_boot_journey(
             "id": "sync",
             "label": "Activate on hub + retrieve messages",
             "status": "ready",
-            "action": "python3 scripts/cdase_client.py sync",
+            "action": "cdase sync",
         })
     else:
         steps.append({
@@ -103,13 +104,13 @@ def build_boot_journey(
         })
 
     # Step 7 — list users (team) — user asks when ready
-    if can_sync and has_roster:
+    if can_sync and has_members:
         steps.append({
             "step": 7,
             "id": "team",
-            "label": "List team (roster + hub new_to_you)",
+            "label": "List team (members + Hub new_to_you)",
             "status": "ready",
-            "action": "python3 scripts/cdase_client.py team",
+            "action": "cdase team",
             "trigger": "User asks who is on the project / list users",
         })
     else:
@@ -132,7 +133,7 @@ def build_boot_journey(
         "hub_url": hub,
         "identity_ok": identity_ok,
         "has_user_profile": has_user_file,
-        "has_roster": has_roster,
+        "has_members": has_members,
         "errors": errors,
         "agent_rule": _agent_rule(hub_blocked, next_step),
     }

@@ -1,14 +1,16 @@
-"""Load CDASE identity, roster, and settings — global user config + repo SSOT.
+"""Load CDASE identity, project members, and settings.
 
-Identity model: **machine = user**. Hub/roster uuid is derived from this machine
-(`machine_user_id`). Display Name comes from the roster row for this machine, or
-from ~/.cdase/user.context.md when joining a repo for the first time.
+Identity model: **machine = user**. The Hub/member id is derived from this
+machine (`machine_user_id`). The global profile supplies defaults, a committed
+member record publishes the project identity, and an optional repo-local
+`user.context.md` overrides the current user's alias/role.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import subprocess
 from pathlib import Path
 
 DEFAULT_HUB_URL = "https://12th.ai/cdase"
@@ -235,8 +237,8 @@ def global_user_name() -> str | None:
     return _read_field(path.read_text(encoding="utf-8"), "Name")
 
 
-def resolve_identity_from_roster(user: dict, roster: list[dict]) -> dict:
-    """Resolve by machine-derived user id in roster (not by Name)."""
+def resolve_identity_from_members(user: dict, members: list[dict]) -> dict:
+    """Resolve the committed project identity by machine-derived user id."""
     from machine_identity import machine_user_id, raw_machine_id
 
     uid = user.get("uuid") or machine_user_id()
@@ -244,31 +246,35 @@ def resolve_identity_from_roster(user: dict, roster: list[dict]) -> dict:
     user["machine_id"] = raw_machine_id()
     user["uuid_from_machine"] = True
 
-    match = next((m for m in roster if m.get("uuid") == user["uuid"]), None)
+    match = next((m for m in members if m.get("uuid") == user["uuid"]), None)
     if match is None:
         return user
-    # Repo roster Name wins for this project (may differ from global Name)
+    # The committed project alias is the shared default for this repository.
     user["name"] = match.get("name") or user.get("name")
     if match.get("role"):
         user["role"] = match.get("role")
-    user["uuid_from_roster"] = True
+    user["status"] = match.get("status")
+    user["uuid_from_members"] = True
     return user
 
 
 def load_user_context(cdase_root: Path) -> dict:
-    """Load identity: machine user id + global Name fallback + roster row for this machine."""
+    """Load identity with global → committed member → local override precedence."""
     from machine_identity import machine_user_id, raw_machine_id
 
+    machine_raw = os.environ.get("CDASE_MACHINE_ID") or raw_machine_id()
     user: dict = {
         "name": None,
-        "uuid": machine_user_id(),
-        "machine_id": raw_machine_id(),
+        "uuid": machine_user_id(machine_raw),
+        "machine_id": machine_raw,
         "role": None,
         "team": None,
         "organization": None,
         "uuid_from_machine": True,
     }
     identity_sources: list[str] = ["machine"]
+    if os.environ.get("CDASE_MACHINE_ID"):
+        identity_sources.append("CDASE_MACHINE_ID")
 
     global_path = global_cdase_dir() / "user.context.md"
     if global_path.exists():
@@ -284,6 +290,11 @@ def load_user_context(cdase_root: Path) -> dict:
             user["organization"] = overlay["organization"]
         identity_sources.append("global")
 
+    members = load_members(cdase_root)
+    user = resolve_identity_from_members(user, members)
+    if user.get("uuid_from_members"):
+        identity_sources.append("member")
+
     repo_path = cdase_root / "context" / "user.context.md"
     if repo_path.exists():
         overlay = _read_user_file(repo_path)
@@ -296,83 +307,179 @@ def load_user_context(cdase_root: Path) -> dict:
     if env_name := os.environ.get("CDASE_USER"):
         user["name"] = env_name
         identity_sources.append("CDASE_USER")
-    if env_mid := os.environ.get("CDASE_MACHINE_ID"):
-        user["machine_id"] = env_mid
-        user["uuid"] = machine_user_id(env_mid)
-        identity_sources.append("CDASE_MACHINE_ID")
-
-    roster = load_roster(cdase_root)
-    user = resolve_identity_from_roster(user, roster)
 
     user["identity_sources"] = identity_sources or ["none"]
     user["identity_source"] = "+".join(identity_sources) if identity_sources else "none"
+    user["alias"] = user.get("name")
     user["global_dir"] = str(global_cdase_dir())
     return user
 
 
-def load_roster(cdase_root: Path) -> list[dict]:
-    path = cdase_root / "context" / "users.context.md"
-    if not path.exists():
+def load_members(cdase_root: Path) -> list[dict]:
+    """Load committed project member records, one file per immutable user id."""
+    members_dir = cdase_root / "context" / "members"
+    if not members_dir.is_dir():
         return []
 
-    roster: list[dict] = []
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line.startswith("|") or line.startswith("|--"):
-            continue
-        if "UUID" in line and "Name" in line:
-            continue
-        parts = [p.strip() for p in line.strip("|").split("|")]
-        if len(parts) < 2:
-            continue
-        name, user_uuid = parts[0], parts[1]
-        if not name or name.startswith("-") or name.lower() == "name":
-            continue
-        if not is_valid_user_id(user_uuid):
-            continue
-        role = parts[2] if len(parts) > 2 else None
-        roster.append({"name": name, "uuid": normalize_user_id(user_uuid), "role": role})
-    return roster
+    members: list[dict] = []
+    for path in sorted(members_dir.glob("*.context.md")):
+        file_id = path.name.removesuffix(".context.md")
+        if not USER_ID_RE.fullmatch(file_id):
+            raise ValueError(f"invalid member filename (expected 8-hex id): {path}")
+        text = path.read_text(encoding="utf-8")
+        declared_id = _read_field(text, "User ID")
+        if not declared_id or not USER_ID_RE.fullmatch(declared_id):
+            raise ValueError(f"member record has missing/invalid User ID: {path}")
+        uid = normalize_user_id(declared_id)
+        if uid != normalize_user_id(file_id):
+            raise ValueError(f"member filename/id mismatch: {path} declares {declared_id}")
+        alias = _read_field(text, "Alias")
+        if not alias:
+            raise ValueError(f"member record has no Alias: {path}")
+        status = (_read_field(text, "Status") or "active").lower()
+        if status not in {"active", "inactive"}:
+            raise ValueError(f"member record has invalid Status: {path}")
+        commit_state = member_commit_state(path)
+        members.append({
+            "alias": alias,
+            "name": alias,
+            "uuid": uid,
+            "role": _read_field(text, "Role"),
+            "status": status,
+            "path": str(path),
+            "commit_state": commit_state,
+            "committed": commit_state in {"committed", "not_applicable"},
+        })
+    return members
 
 
-def trusted_uuids(roster: list[dict]) -> list[str]:
-    return [m["uuid"] for m in roster]
+def member_commit_state(path: Path, git_root: Path | None = None) -> str:
+    """Return committed|staged|modified|staged_modified|untracked|ignored|unknown."""
+    if (
+        os.environ.get("CDASE_TESTING") == "1"
+        and os.environ.get("CDASE_TEST_MEMBER_STATE")
+    ):
+        return os.environ["CDASE_TEST_MEMBER_STATE"]
+
+    path = path.resolve()
+    if git_root is None:
+        probe = _run_git(["git", "-C", str(path.parent), "rev-parse", "--show-toplevel"])
+        if probe is None or probe.returncode != 0:
+            return "not_applicable"
+        git_root = Path(probe.stdout.strip()).resolve()
+    else:
+        git_root = git_root.resolve()
+
+    try:
+        rel = path.relative_to(git_root).as_posix()
+    except ValueError:
+        return "unknown"
+
+    status = _run_git(
+        [
+            "git", "status", "--porcelain=v1", "--ignored",
+            "--untracked-files=all", "--", rel,
+        ],
+        cwd=git_root,
+    )
+    if status is None or status.returncode != 0:
+        return "unknown"
+    line = next((item for item in status.stdout.splitlines() if item), "")
+    if line:
+        code = line[:2]
+        if code == "!!":
+            return "ignored"
+        if code == "??":
+            return "untracked"
+        staged = code[0] not in {" ", "?"}
+        modified = code[1] not in {" ", "?"}
+        if staged and modified:
+            return "staged_modified"
+        if staged:
+            return "staged"
+        if modified:
+            return "modified"
+        return "unknown"
+
+    tracked = _run_git(
+        ["git", "ls-files", "--error-unmatch", "--", rel],
+        cwd=git_root,
+    )
+    if tracked is None or tracked.returncode != 0:
+        return "untracked"
+    in_head = _run_git(
+        ["git", "cat-file", "-e", f"HEAD:{rel}"],
+        cwd=git_root,
+    )
+    return "committed" if in_head is not None and in_head.returncode == 0 else "staged"
 
 
-def trust_csv(roster: list[dict]) -> str:
-    return ",".join(trusted_uuids(roster))
+def _run_git(args: list[str], *, cwd: Path | None = None):
+    try:
+        return subprocess.run(
+            args,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
 
 
-def validate_identity(user: dict, roster: list[dict]) -> tuple[bool, list[str]]:
+def trusted_uuids(members: list[dict]) -> list[str]:
+    return [
+        m["uuid"] for m in members
+        if m.get("status", "active") == "active" and m.get("committed", True)
+    ]
+
+
+def trust_csv(members: list[dict]) -> str:
+    return ",".join(trusted_uuids(members))
+
+
+def validate_identity(user: dict, members: list[dict]) -> tuple[bool, list[str]]:
     errors: list[str] = []
     gdir = global_cdase_dir()
 
-    if not roster:
-        errors.append("context/users.context.md missing or empty — repo roster is SSOT for trust")
+    if not members:
+        errors.append("context/members/ missing or empty — project members are the trust SSOT")
 
     uid = user.get("uuid")
     if not uid or not is_valid_user_id(uid):
         errors.append("machine user id missing/invalid — check CDASE_MACHINE_ID / machine_identity")
     else:
-        match = next((m for m in roster if m.get("uuid") == normalize_user_id(uid)), None)
+        match = next((m for m in members if m.get("uuid") == normalize_user_id(uid)), None)
         if match is None:
             errors.append(
-                f"machine user id '{uid}' not in repo roster (users.context.md) — "
-                "run boot to add this machine, or set Name globally first"
+                f"machine user id '{uid}' has no project member record — "
+                "run boot to create one, or set Alias globally first"
+            )
+        elif match.get("status") != "active":
+            errors.append(f"project member '{uid}' is inactive")
+        elif not match.get("committed", True):
+            errors.append(
+                f"project member '{uid}' is pending ({match.get('commit_state')}); "
+                "commit the member record before Hub actions"
             )
         elif not match.get("name") and not user.get("name"):
-            errors.append("roster row has no Name for this machine")
+            errors.append("member record has no Alias for this machine")
 
     if not user.get("name"):
         errors.append(
-            f"display Name missing — set Name in {gdir}/user.context.md or roster row for this machine"
+            f"display Alias missing — set Name in {gdir}/user.context.md or this machine's member record"
         )
 
     return len(errors) == 0, errors
 
 
-def resolve_recipient(to: str, roster: list[dict]) -> dict | None:
+def resolve_recipient(to: str, members: list[dict]) -> dict | None:
+    active = [
+        m for m in members
+        if m.get("status", "active") == "active" and m.get("committed", True)
+    ]
     if is_valid_user_id(to):
         needle = normalize_user_id(to)
-        return next((m for m in roster if m["uuid"] == needle), None)
-    return next((m for m in roster if m["name"].lower() == to.lower()), None)
+        return next((m for m in active if m["uuid"] == needle), None)
+    matches = [m for m in active if m["name"].lower() == to.lower()]
+    return matches[0] if len(matches) == 1 else None

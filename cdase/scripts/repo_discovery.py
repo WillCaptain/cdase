@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 from repo_boundary import find_git_root
+from repo_maturity import classify_repo_maturity
 
 
 def skill_package_dir(repo_root: Path) -> Path:
@@ -154,7 +155,7 @@ def repo_entry(repo_root: Path) -> dict:
     framework = is_framework_repo(root)
     cdase = consumer_cdase_dir(root)
     initialized = has_consumer_cdase(root)
-    return {
+    entry = {
         "path": str(root),
         "name": root.name,
         "is_framework": framework,
@@ -162,6 +163,9 @@ def repo_entry(repo_root: Path) -> dict:
         "needs_init": needs_consumer_cdase_init(root),
         "cdase_root": str(cdase) if initialized else None,
     }
+    if not framework:
+        entry.update(classify_repo_maturity(root))
+    return entry
 
 
 def classify_workspace(workspace: Path | None = None) -> dict:

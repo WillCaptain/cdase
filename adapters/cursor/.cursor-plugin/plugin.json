@@ -1,0 +1,14 @@
+{
+  "name": "cdase",
+  "version": "1.9.0",
+  "description": "CDASE: global API-pool anti-duplication; colocated governed artifacts; machine-as-user.",
+  "author": {
+    "name": "12th.ai"
+  },
+  "keywords": [
+    "cdase",
+    "session-gate",
+    "hub",
+    "methodology"
+  ]
+}

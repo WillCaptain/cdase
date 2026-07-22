@@ -30,7 +30,7 @@ SCP() { sshpass -p "$REMOTE_PASS" scp "${SSH_OPTS[@]}" "$@"; }
 
 echo "▶ build hub jar"
 (cd "$REPO_ROOT/hub" && mvn -q package -DskipTests)
-JAR="$REPO_ROOT/hub/target/cdase-hub-1.0.0.jar"
+JAR="$REPO_ROOT/hub/target/cdase-hub-1.1.0.jar"
 [[ -f "$JAR" ]] || { echo "missing $JAR" >&2; exit 1; }
 
 echo "▶ prepare $REMOTE_DIR"
@@ -41,6 +41,7 @@ SCP "$JAR" "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/cdase-hub.jar"
 SCP \
   "$SCRIPT_DIR/start.sh" \
   "$SCRIPT_DIR/stop.sh" \
+  "$SCRIPT_DIR/hub.env.example" \
   "$SCRIPT_DIR/nginx-cdase.conf" \
   "$SCRIPT_DIR/remote-install-nginx.sh" \
   "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/"

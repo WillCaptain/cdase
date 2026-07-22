@@ -28,6 +28,25 @@ class BuildAgentTeamBriefTest(unittest.TestCase):
         self.assertIn("new_to_you", brief["agent_brief"])
         self.assertIn("will", brief["must_not_auto_trust"])
 
+    def test_inactive_and_pending_members_are_not_listed_as_trusted(self):
+        members = merge_team(
+            [
+                {"name": "former", "uuid": "8021d819", "status": "inactive"},
+                {
+                    "name": "pending",
+                    "uuid": "a1b2c3d4",
+                    "status": "active",
+                    "committed": False,
+                    "commit_state": "untracked",
+                },
+            ],
+            [],
+        )
+        brief = build_agent_team_brief({"name": "evan"}, members)
+        self.assertIn("Inactive project members", brief["agent_brief"])
+        self.assertIn("Pending member records", brief["agent_brief"])
+        self.assertEqual(brief["others_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

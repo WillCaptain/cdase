@@ -1,15 +1,17 @@
 # Global User Profile
 
-> Set once at `~/.cdase/user.context.md` (or `$CDASE_GLOBAL/user.context.md`).
-> Windows: `%USERPROFILE%\.cdase\user.context.md`. Legacy: `~/.cursor/cdase` if `~/.cdase` absent.
+> Set once at `<GLOBAL_CDASE>/user.context.md`.
+> `<GLOBAL_CDASE>` is `CDASE_GLOBAL` when set, otherwise `~/.cdase` on
+> macOS/Linux or `%USERPROFILE%\.cdase` on Windows.
 > Template: [user.global.md](user.global.md) (this file)
 >
-> **User id = this machine** (`sha256(machine_id)[:8]` in each repo roster).
-> `Name` here is the default display name when this machine first joins a repo.
-> Per-repo Name in `users.context.md` may differ without changing this file.
+> **User id = this machine** (`sha256(machine_id)[:8]`).
+> Alias/Role here are defaults. A gitignored repo `user.context.md` may override
+> them; `boot` writes the result into that repo's shared member record, which
+> must be committed before it grants trust.
 
 ## Identity
-- Name: [your name]
+- Name: [your default display name; published as member Alias]
 - Role: [optional default role]
 - Team: [optional]
 - Organization: [optional]

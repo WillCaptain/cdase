@@ -1,5 +1,6 @@
 package com.cdase.hub;
 
+import com.cdase.hub.apipool.ApiPoolRuntime;
 import com.cdase.hub.db.Database;
 import com.cdase.hub.http.HubHttpServer;
 import com.cdase.hub.store.HubStore;
@@ -25,11 +26,17 @@ public final class CdaseHub {
         dataDir.toFile().mkdirs();
         Path dbFile = dataDir.resolve("cdase-hub");
 
-        try (Database database = new Database(dbFile)) {
+        try (Database database = new Database(dbFile);
+             ApiPoolRuntime apiPool = ApiPoolRuntime.fromEnvironment(database)) {
             HubStore store = new HubStore(database);
-            HubHttpServer server = new HubHttpServer(host, port, store);
-            System.out.printf("CDASE Hub (Java) listening on http://%s:%d  (db: %s.mv.db)%n",
-                    host, port, dbFile.toAbsolutePath());
+            HubHttpServer server = new HubHttpServer(host, port, store, apiPool);
+            System.out.printf(
+                    "CDASE Hub (Java) listening on http://%s:%d  (db: %s.mv.db, api-pool: %s)%n",
+                    host,
+                    port,
+                    dbFile.toAbsolutePath(),
+                    apiPool.providerName()
+            );
             server.start();
         }
     }

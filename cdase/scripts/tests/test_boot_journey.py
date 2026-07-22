@@ -15,6 +15,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from boot_journey import build_boot_journey
 from context_loader import hub_url_state, load_settings
+from machine_identity import write_member_record
 
 
 class HubUrlStateTests(unittest.TestCase):
@@ -57,9 +58,7 @@ class BootJourneyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "cdase"
             (root / "context").mkdir(parents=True)
-            (root / "context" / "users.context.md").write_text(
-                "| Name | UUID | Role |\n|------|------|------|\n| evan | 39cb62d4 | lead |\n"
-            )
+            write_member_record(root, name="evan", user_id="39cb62d4", role="lead")
             journey = build_boot_journey(
                 identity_ok=False,
                 settings=self._settings(sources=["defaults"]),
@@ -73,9 +72,7 @@ class BootJourneyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "cdase"
             (root / "context").mkdir(parents=True)
-            (root / "context" / "users.context.md").write_text(
-                "| Name | UUID | Role |\n|------|------|------|\n| evan | 39cb62d4 | lead |\n"
-            )
+            write_member_record(root, name="evan", user_id="39cb62d4", role="lead")
             journey = build_boot_journey(
                 identity_ok=True,
                 settings=self._settings(sources=["global"]),

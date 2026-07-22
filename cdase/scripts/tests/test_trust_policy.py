@@ -37,6 +37,16 @@ class TrustPolicyTest(unittest.TestCase):
         self.assertEqual(len(new), 1)
         self.assertEqual(new[0]["name"], "will")
 
+    def test_inactive_member_is_present_but_not_trusted_or_duplicated(self):
+        roster = [
+            {"name": "former", "uuid": "8021d819", "role": "dev", "status": "inactive"}
+        ]
+        hub = [{"uuid": "8021d819", "name": "former", "active": True}]
+        members = merge_team(roster, hub)
+        self.assertEqual(len(members), 1)
+        self.assertEqual(members[0]["status"], "inactive")
+        self.assertFalse(members[0]["trusted"])
+
     def test_split_messages_counts(self):
         roster = [{"name": "evan", "uuid": "39cb62d4"}]
         msgs = [

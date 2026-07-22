@@ -13,6 +13,9 @@ hub/deploy/.env
 # Python cache
 __pycache__/
 *.pyc
+build/
+dist/
+*.egg-info/
 
 # Per-user identity (personal — never committed; see cdase/resources/charter.md)
 **/context/user.context.md

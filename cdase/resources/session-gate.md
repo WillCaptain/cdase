@@ -3,6 +3,12 @@
 > **Agent-neutral**. Applies to any code agent.
 > CDASE is never assumed — the user must opt in when the work is software-related.
 
+`<CDASE_CLIENT>` means installed `cdase` after `python -m pip install .`
+(Windows: `py -m pip install .`), with the bundled
+`python3 <skill-root>/scripts/cdase_client.py` fallback.
+`<GLOBAL_CDASE>` means `CDASE_GLOBAL` when set, else `~/.cdase` on
+macOS/Linux or `%USERPROFILE%\.cdase` on Windows.
+
 ## When to ask (not every chat)
 
 Do **not** open with “Apply CDASE?” on every session.
@@ -14,7 +20,7 @@ declared on/off this session, **and** at least one of:
    build manifests (`package.json`, `pom.xml`, `Cargo.toml`, `go.mod`, …), or the user
    is joining a code project (“I'm joining the project”).
 2. **The question is strongly code-related** — implement, debug, PR, build, test,
-   refactor, deploy, repo team/roster, etc.
+   refactor, deploy, project membership, etc.
 
 **Never ask** for clearly non-software work (paper, essay, prose writing, casual chat
 with no code context). Be a normal assistant. User may say `cdase on` anytime.
@@ -44,12 +50,13 @@ If workspace is only the **framework** repo, tell the user to open the applicati
 
 ## One-time global setup (not per session)
 
-On first `cdase on`, if `~/.cdase/user.context.md` is missing, use the
+On first `cdase on`, if `<GLOBAL_CDASE>/user.context.md` is missing, use the
 **host-native input flow** — see [protocol/input.md](protocol/input.md):
 
-1. `python3 scripts/cdase_client.py input-spec user-profile` → global **Name** (scope implied).
+1. `<CDASE_CLIENT> input-spec user-profile` → global profile (scope implied).
 2. Collect values; agent runs `apply-global-user --json '...'`.
-3. `boot` registers **this machine** on `users.context.md` (machine-derived user id).
+3. `boot` writes this machine to
+   `context/members/<8-hex-user-id>.context.md`; commit that record before trust.
 4. Do **not** invent a random UUID; do not create repo `user.context.md` unless overriding.
 
 ### Later: set or update identity (global **or** this repo)
@@ -57,7 +64,7 @@ On first `cdase on`, if `~/.cdase/user.context.md` is missing, use the
 When the user asks to add/change profile and does not say where, ask scope first:
 
 ```
-python3 scripts/cdase_client.py input-spec user-scope
+<CDASE_CLIENT> input-spec user-scope
 ```
 
 | Choice | Next |
@@ -65,9 +72,10 @@ python3 scripts/cdase_client.py input-spec user-scope
 | global | `user-profile` → `apply-global-user` |
 | this repo | `user-profile-repo` → `apply-repo-user` |
 
-Repo override is gitignored. Global and repo can both be updated anytime.
+Repo override is gitignored and controls only the current user's Alias/Role.
+`boot` writes it into that user's shared member record; commit the record before trust.
 
-If `~/.cdase/setting.context.md` is missing, **copy** the skill template
+If `<GLOBAL_CDASE>/setting.context.md` is missing, **copy** the skill template
 `cdase/resources/templates/setting.context.md` there (`boot` or `init-global-setting`).
 Default Address is `https://12th.ai/cdase`. Ask `input-spec hub-address` only when the
 user wants a different hub. Until a global/repo setting exists, **do not** invoke
@@ -76,11 +84,25 @@ sync, team, send, or inbox.
 ## Zero-to-start journey (after opt-in)
 
 ```
-python3 scripts/cdase_client.py boot
+<CDASE_CLIENT> discover
+<CDASE_CLIENT> check
 ```
 
-Returns `next_step`, `hub_tools_blocked`, and ordered steps 1→4→7. Run `sync` when step 4 is
-ready; run `team` when the user asks to list users.
+Load the Constitution, discover the application repo, and run `check` first.
+Run `boot` only when `check` reports missing state. After identity and an
+explicit Hub URL are valid, run `sync` before every user answer. Run `team`
+when the user asks to list users.
+
+After boot/`legacy-classify`, treat adoption and maturity as orthogonal:
+
+| `codebase_state` | Agent action |
+|---|---|
+| `GREENFIELD` | Initialize CDASE normally — do **not** run a legacy scan |
+| `LEGACY` / `PARTIAL_LEGACY` | Offer **Legacy Onboarding** (isolated `legacy-scan-spec`) before Feature/Function work |
+| `MANAGED` | Proceed with Global API Pool REUSE/EVOLVE/CREATE |
+
+Missing `cdase/context/` is only `CDASE_UNINITIALIZED`. See
+[protocol/legacy-scan.md](protocol/legacy-scan.md) and charter §5–§6.
 
 ## Interpreting the answer
 
@@ -91,7 +113,11 @@ ready; run `team` when the user asks to list users.
 
 ## While the session runs
 
-- **CDASE ON**: Read [../SKILL.md](../SKILL.md), then [charter.md](charter.md). **Run `check` immediately** — contacts cdase-hub (health + presence); show `hub_warning` if hub is down. Mid-session `cdase on` → run `check` again.
+- **CDASE ON**: Read [../SKILL.md](../SKILL.md), then [charter.md](charter.md).
+  Discover the app repo and run `check` first; use `boot` only to create missing
+  state. Once identity and
+  explicit Hub URL are valid, run `sync` for presence + messages and show
+  `hub_warning` if the Hub is down.
 - **CDASE OFF**: Do not load CDASE unless user says `cdase on`.
 - Toggle: `cdase on` / `cdase off`.
 

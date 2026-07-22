@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdase"
+version = "1.9.0"
+description = "Context-Driven AI Software Engineering client"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+cdase = "cdase.scripts.cdase_client:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["cdase", "cdase.scripts"]
+
+[tool.setuptools.package-data]
+cdase = ["SKILL.md", "resources/**/*.md", "resources/**/*.yml", "resources/**/*.yaml"]
